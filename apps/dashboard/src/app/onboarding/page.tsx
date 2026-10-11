@@ -83,7 +83,7 @@ export default function OnboardingPage() {
         <p className="brand-name">InstaQuotesAI</p>
         <h1>Set up your company</h1>
         <p>
-          Signed in as <span className="nowrap">{state.session.email}</span>. Your company starts on a trial of 50 estimates a month,
+          Signed in as <span className="nowrap">{state.session.email}</span>. Your company starts on a trial of 5 estimates a month,
           serving all of Pennsylvania. Next you’ll check where you work, then set your prices: homeowners see no quote until you publish them.
         </p>
         {error && (

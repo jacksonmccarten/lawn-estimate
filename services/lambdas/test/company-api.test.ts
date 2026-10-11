@@ -401,7 +401,7 @@ describe("POST /company (sign-up)", () => {
     expect((await get(login.sub, "GET /pricing-versions")).body.versions).toEqual([]);
 
     const [row] = await db.asCompany(body.id, async (q) => (await q.query("SELECT alert_email, regrid_lookup_quota FROM companies")).rows);
-    expect(row).toEqual({ alert_email: "sub-signup-1@example.com", regrid_lookup_quota: 50 });
+    expect(row).toEqual({ alert_email: "sub-signup-1@example.com", regrid_lookup_quota: 5 });
   });
 
   it("gives a second company of the same name its own slug", async () => {

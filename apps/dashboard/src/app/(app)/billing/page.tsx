@@ -39,8 +39,9 @@ export default function BillingPage() {
       <section className="card prose" aria-labelledby="plan-heading">
         <h2 id="plan-heading">Your plan</h2>
         <p>
-          A new company starts on the free Trial, which prices 50 estimates a month. The Standard plan prices as many as your customers ask for. When a
-          month&rsquo;s estimates run out, the widget tells homeowners that instant estimates are paused until the next month.
+          A new company starts on the free Trial, which prices 5 estimates a month. The Standard plan prices as many as your customers ask for: pay
+          $20 a month, or $200 for a full year. When a month&rsquo;s estimates run out, the widget tells homeowners that instant estimates are paused
+          until the next month.
         </p>
         <p>
           Plans, payment and invoices are handled by AWS Monetization. Both buttons take you to its pages, which bring you back here when you&rsquo;re
