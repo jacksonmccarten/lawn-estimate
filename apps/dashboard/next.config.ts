@@ -37,6 +37,8 @@ const config: NextConfig = {
           { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          // HTTPS only, for a year, on every name under the domain (the API and the widget are HTTPS too).
+          { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
         ],
       },
     ];

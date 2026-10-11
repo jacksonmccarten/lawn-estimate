@@ -16,6 +16,7 @@ import { createCompanyApi } from "../src/company/api.js";
 import type { HttpEvent, HttpResult } from "../src/http.js";
 import { log } from "../src/log.js";
 import type { PublicDeps } from "../src/public/deps.js";
+import { NO_EDGE } from "../src/public/edge.js";
 import { createEstimateHandler } from "../src/public/estimate.js";
 import { createNotifier } from "../src/public/notify.js";
 import { createProfileHandler } from "../src/public/profile.js";
@@ -60,6 +61,8 @@ const publicDeps: PublicDeps = {
   billing,
   ipHashSalt: env.ipHashSalt,
   widgetOrigin: env.widgetOrigin,
+  // No CloudFront locally.
+  edge: NO_EDGE,
   log,
 };
 

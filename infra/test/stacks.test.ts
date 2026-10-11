@@ -7,6 +7,7 @@ import { Match, Template } from "aws-cdk-lib/assertions";
 import { describe, expect, it } from "vitest";
 import { ApiStack } from "../lib/api-stack.js";
 import { readConfig } from "../lib/config.js";
+import { EdgeStack } from "../lib/edge-stack.js";
 import { StateStack } from "../lib/state-stack.js";
 
 const context = {
@@ -24,8 +25,9 @@ function synth(over: Record<string, unknown> = {}) {
   const config = readConfig(app);
   const env = { account: "111111111111", region: config.region };
   const state = new StateStack(app, "LqState", { env, config });
-  const api = new ApiStack(app, "LqApi", { env, config, state });
-  return { state: Template.fromStack(state), api: Template.fromStack(api) };
+  const edge = config.edge ? new EdgeStack(app, "LqEdge", { env: { account: env.account, region: "us-east-1" }, edge: config.edge }) : undefined;
+  const api = new ApiStack(app, "LqApi", { env, config, state, edge });
+  return { state: Template.fromStack(state), api: Template.fromStack(api), edge: edge && Template.fromStack(edge) };
 }
 
 const { state, api } = synth();
@@ -77,9 +79,9 @@ describe("state stack", () => {
     });
   });
 
-  it("keeps a login per database role, and the three application secrets apart", () => {
-    // Owner, app_rw, app_public, Turnstile, quote token, IP salt.
-    state.resourceCountIs("AWS::SecretsManager::Secret", 6);
+  it("keeps a login per database role, and the application secrets apart", () => {
+    // Owner, app_rw, app_public, Turnstile, quote token, IP salt, origin verify.
+    state.resourceCountIs("AWS::SecretsManager::Secret", 7);
     for (const username of ["app_owner", "app_rw", "app_public"]) {
       state.hasResourceProperties("AWS::SecretsManager::Secret", {
         GenerateSecretString: Match.objectLike({ SecretStringTemplate: JSON.stringify({ username }), GenerateStringKey: "password" }),
@@ -199,6 +201,77 @@ describe("api stack", () => {
   });
 });
 
+describe("behind CloudFront and WAF", () => {
+  const edgeContext = { zoneName: "example.com", hostedZoneId: "Z0123456789ABCDEFGHIJ", apiDomain: "api.example.com" };
+  const logOnly = synth({ ...edgeContext, originVerify: "log" });
+  const enforced = synth({ ...edgeContext, originVerify: "enforce" });
+
+  it("puts the API behind a distribution at its own name, with the web ACL, and nothing cached", () => {
+    logOnly.api.hasResourceProperties("AWS::CloudFront::Distribution", {
+      DistributionConfig: Match.objectLike({
+        Aliases: ["api.example.com"],
+        WebACLId: Match.anyValue(),
+        ViewerCertificate: Match.objectLike({ MinimumProtocolVersion: "TLSv1.2_2021" }),
+        DefaultCacheBehavior: Match.objectLike({
+          ViewerProtocolPolicy: "https-only",
+          CachePolicyId: "4135ea2d-6df8-44a3-9df3-4b5a84be39ad",
+          OriginRequestPolicyId: "b689b0a8-53d0-40ab-baf2-68738e2966ac",
+          FunctionAssociations: [Match.objectLike({ EventType: "viewer-request" })],
+        }),
+        Origins: [
+          Match.objectLike({
+            OriginCustomHeaders: [{ HeaderName: "x-origin-verify", HeaderValue: Match.anyValue() }],
+            CustomOriginConfig: Match.objectLike({ OriginProtocolPolicy: "https-only" }),
+          }),
+        ],
+      }),
+    });
+    logOnly.api.resourceCountIs("AWS::Route53::RecordSet", 2);
+    logOnly.api.hasOutput("PublicApiUrl", { Value: "https://api.example.com" });
+  });
+
+  it("sends HSTS on every API response", () => {
+    logOnly.api.hasResourceProperties("AWS::CloudFront::ResponseHeadersPolicy", {
+      ResponseHeadersPolicyConfig: Match.objectLike({
+        SecurityHeadersConfig: Match.objectLike({ StrictTransportSecurity: Match.objectLike({ AccessControlMaxAgeSec: 31536000, IncludeSubdomains: true }) }),
+      }),
+    });
+  });
+
+  it("gives the public functions the origin-verify secret, and enforces it only when told", () => {
+    const env = (template: Template, name: string) => {
+      const found = Object.entries(template.findResources("AWS::Lambda::Function")).find(([id]) => id.startsWith(name));
+      return (found![1] as { Properties: { Environment: { Variables: Record<string, unknown> } } }).Properties.Environment.Variables;
+    };
+    for (const name of ["Estimate", "Submit", "Profile"]) {
+      expect(env(logOnly.api, name).ORIGIN_VERIFY_ENFORCE, name).toBe("false");
+      expect(env(enforced.api, name).ORIGIN_VERIFY_ENFORCE, name).toBe("true");
+      expect(JSON.stringify(env(enforced.api, name).SECRETS_ARN), name).toMatch(/OriginVerifySecret/);
+    }
+    expect(env(enforced.api, "CompanyApi").ORIGIN_VERIFY_ENFORCE).toBeUndefined();
+    // Without an edge, nothing changes.
+    expect(env(api, "Estimate").ORIGIN_VERIFY_ENFORCE).toBeUndefined();
+    api.resourceCountIs("AWS::CloudFront::Distribution", 0);
+  });
+
+  it("has a certificate for the API's name and a CloudFront web ACL with rate limits and bot control on the public routes", () => {
+    const edge = logOnly.edge!;
+    edge.hasResourceProperties("AWS::CertificateManager::Certificate", { DomainName: "api.example.com", ValidationMethod: "DNS" });
+    edge.hasResourceProperties("AWS::WAFv2::WebACL", {
+      Scope: "CLOUDFRONT",
+      DefaultAction: { Allow: {} },
+      Rules: Match.arrayWith([
+        Match.objectLike({ Name: "PublicRoutesPerAddress", Statement: { RateBasedStatement: Match.objectLike({ Limit: 100, EvaluationWindowSec: 300 }) } }),
+        Match.objectLike({ Name: "AllRoutesPerAddress", Statement: { RateBasedStatement: Match.objectLike({ Limit: 1000 }) } }),
+        Match.objectLike({
+          Name: "AWSManagedRulesBotControlRuleSet",
+          Statement: { ManagedRuleGroupStatement: Match.objectLike({ ScopeDownStatement: Match.anyValue() }) },
+        }),
+      ]),
+    });
+  });
+});
+
 describe("configuration", () => {
   it("refuses an origin with a path, a plain http origin, or a missing value", () => {
     const config = (over: Record<string, unknown>) => readConfig(new App({ context: { ...context, ...over } }));
@@ -209,5 +282,9 @@ describe("configuration", () => {
     expect(() => config({ databaseClusterArn: "lq-db" })).toThrow(/databaseClusterArn/);
     expect(() => config({ databaseClusterArn: undefined })).toThrow(/databaseSnapshot/);
     expect(() => config({ databaseSnapshot: "lq-db-snap" })).toThrow(/databaseSnapshot/);
+    const edge = { zoneName: "example.com", hostedZoneId: "Z0123456789ABCDEFGHIJ", apiDomain: "api.example.com", originVerify: "log" };
+    expect(config(edge).edge).toEqual(edge);
+    expect(() => config({ ...edge, apiDomain: "api.other.com" })).toThrow(/apiDomain/);
+    expect(() => config({ ...edge, originVerify: "on" })).toThrow(/originVerify/);
   });
 });

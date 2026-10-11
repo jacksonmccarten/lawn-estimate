@@ -79,7 +79,8 @@ function signIn(pool: CognitoUserPool, email: string, password: string): Promise
 }
 
 const [state, api] = [await outputs("LqState"), await outputs("LqApi")];
-const base = api.ApiUrl!;
+// Through CloudFront and WAF when the API is behind them, as the front ends call it.
+const base = (api.PublicApiUrl ?? api.ApiUrl)!;
 const widget = context.widgetOrigin!;
 const cognito = new CognitoIdentityProviderClient({ region });
 const owner = new DataApiDbClient({ resourceArn: state.DatabaseClusterArn!, secretArn: state.OwnerLoginArn!, database: "lawnquote" });
@@ -111,6 +112,11 @@ try {
   check("public profile", profile.status === 200 && profile.body?.slug === DEMO_SLUG, `${profile.status}`);
   check("an unknown company is a 404", (await call("GET", "/profile/no-such-company")).status === 404);
   check("another origin may not ask for an estimate", (await call("POST", "/estimate", { body: {}, origin: "https://evil.example" })).status === 403);
+  if (api.PublicApiUrl && context.originVerify === "enforce") {
+    // Straight to API Gateway, around CloudFront and WAF.
+    const direct = await fetch(`${api.ApiUrl}/profile/${DEMO_SLUG}`);
+    check("the API refuses a request that skipped CloudFront", direct.status === 403, `${direct.status}`);
+  }
 
   const address = `1 Smoke Test Ln, State College, PA 16801 (${email})`;
   const common = { turnstile: "smoke-test-token", embedOrigin: null };

@@ -6,6 +6,7 @@ import { EstimateResponse } from "@lq/api-contract";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { Entitlement } from "../src/billing.js";
 import type { PublicDeps } from "../src/public/deps.js";
+import { NO_EDGE } from "../src/public/edge.js";
 import { createEstimateHandler } from "../src/public/estimate.js";
 import { createProfileHandler } from "../src/public/profile.js";
 import type { AlertTargets, LeadAlert } from "../src/public/notify.js";
@@ -89,6 +90,7 @@ beforeAll(async () => {
     billing: null,
     ipHashSalt: "pepper",
     widgetOrigin: null,
+    edge: NO_EDGE,
     log: (level, name, fields) => void logs.push({ level, event: name, fields }),
   };
   estimate = createEstimateHandler(deps);

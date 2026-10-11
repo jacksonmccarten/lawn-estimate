@@ -11,13 +11,18 @@ import { CfnOutput, Duration, Stack, type StackProps } from "aws-cdk-lib";
 import { CfnStage, CorsHttpMethod, HttpApi, HttpMethod } from "aws-cdk-lib/aws-apigatewayv2";
 import { HttpUserPoolAuthorizer } from "aws-cdk-lib/aws-apigatewayv2-authorizers";
 import { HttpLambdaIntegration } from "aws-cdk-lib/aws-apigatewayv2-integrations";
+import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
+import * as origins from "aws-cdk-lib/aws-cloudfront-origins";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import { NodejsFunction, OutputFormat } from "aws-cdk-lib/aws-lambda-nodejs";
 import * as logs from "aws-cdk-lib/aws-logs";
+import * as route53 from "aws-cdk-lib/aws-route53";
+import * as targets from "aws-cdk-lib/aws-route53-targets";
 import type * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import type { Construct } from "constructs";
 import type { Config } from "./config.js";
+import type { EdgeStack } from "./edge-stack.js";
 import { DATABASE_NAME, type StateStack } from "./state-stack.js";
 
 const REPO = fileURLToPath(new URL("../../", import.meta.url));
@@ -39,12 +44,21 @@ const DATA_API_ACTIONS = [
 const MONETIZATION_ESTIMATE_ACTIONS = ["appmonetization:GetEntitlementDecision", "appmonetization:PutEvent"];
 const MONETIZATION_DASHBOARD_ACTIONS = ["appmonetization:CreateSubscriptionCheckoutSession", "appmonetization:CreateBillingPortalSession"];
 
-export type ApiStackProps = StackProps & { config: Config; state: StateStack };
+export type ApiStackProps = StackProps & { config: Config; state: StateStack; edge?: EdgeStack };
+
+/**
+ * Runs on every request at CloudFront: the visitor's address, in a header
+ * the visitor cannot set, since this overwrites it (public/edge.ts).
+ */
+const VIEWER_IP_FUNCTION = `function handler(event) {
+  event.request.headers["x-viewer-ip"] = { value: event.viewer.ip };
+  return event.request;
+}`;
 
 export class ApiStack extends Stack {
   constructor(scope: Construct, id: string, props: ApiStackProps) {
-    super(scope, id, props);
-    const { config, state } = props;
+    super(scope, id, { ...props, crossRegionReferences: props.edge !== undefined });
+    const { config, state, edge } = props;
 
     const database = { DB_RESOURCE_ARN: state.clusterArn, DB_NAME: DATABASE_NAME };
 
@@ -81,10 +95,14 @@ export class ApiStack extends Stack {
       ? { MONETIZATION_APP_ID: config.monetization.appId, MONETIZATION_ENDPOINT: config.monetization.endpoint }
       : {};
 
+    // Behind CloudFront, the public functions check its origin-verify header (public/edge.ts).
+    const edgeSecrets = config.edge ? [state.originVerifySecret] : [];
+    const edgeEnvironment: Record<string, string> = config.edge ? { ORIGIN_VERIFY_ENFORCE: String(config.edge.originVerify === "enforce") } : {};
     const publicEnvironment = {
       ...monetization,
       DB_PUBLIC_SECRET_ARN: state.publicLogin.secretArn,
-      SECRETS_ARN: state.appSecrets.map((s) => s.secretArn).join(","),
+      SECRETS_ARN: [...state.appSecrets, ...edgeSecrets].map((s) => s.secretArn).join(","),
+      ...edgeEnvironment,
       WIDGET_ORIGIN: config.widgetOrigin,
       DASHBOARD_URL: config.dashboardOrigin,
       SES_FROM: config.sesFrom,
@@ -94,7 +112,7 @@ export class ApiStack extends Stack {
     // The public functions log in as app_public, with its own credentials, and can read no other login.
     const estimate = fn("Estimate", "estimate", [state.publicLogin], { environment: publicEnvironment });
     const submit = fn("Submit", "submit", [state.publicLogin], { environment: publicEnvironment });
-    for (const func of [estimate, submit]) for (const secret of state.appSecrets) secret.grantRead(func);
+    for (const func of [estimate, submit]) for (const secret of [...state.appSecrets, ...edgeSecrets]) secret.grantRead(func);
     submit.addToRolePolicy(
       new iam.PolicyStatement({
         actions: ["ses:SendEmail"],
@@ -102,7 +120,13 @@ export class ApiStack extends Stack {
         conditions: { StringEquals: { "ses:FromAddress": config.sesFrom } },
       }),
     );
-    const profile = fn("Profile", "profile", [state.publicLogin], { environment: { DB_PUBLIC_SECRET_ARN: state.publicLogin.secretArn } });
+    const profile = fn("Profile", "profile", [state.publicLogin], {
+      environment: {
+        DB_PUBLIC_SECRET_ARN: state.publicLogin.secretArn,
+        ...(config.edge ? { SECRETS_ARN: state.originVerifySecret.secretArn, ...edgeEnvironment } : {}),
+      },
+    });
+    for (const secret of edgeSecrets) secret.grantRead(profile);
     const companyApi = fn("CompanyApi", "company-api", [state.rwLogin], {
       environment: { ...monetization, DB_RW_SECRET_ARN: state.rwLogin.secretArn, DASHBOARD_URL: config.dashboardOrigin },
     });
@@ -159,7 +183,57 @@ export class ApiStack extends Stack {
       }
     }
 
-    new CfnOutput(this, "ApiUrl", { value: api.apiEndpoint, description: "LQ_API_BASE for the widget, NEXT_PUBLIC_API_BASE_URL for the dashboard" });
+    if (config.edge && edge) {
+      // Nothing is cached: every response is a person's own. All of the
+      // visitor's headers but Host reach API Gateway, which answers only to
+      // its own name; CloudFront adds the origin-verify header.
+      const distribution = new cloudfront.Distribution(this, "ApiDistribution", {
+        comment: "Instant Lawn Quote API, behind WAF",
+        domainNames: [config.edge.apiDomain],
+        certificate: edge.certificate,
+        webAclId: edge.webAclArn,
+        minimumProtocolVersion: cloudfront.SecurityPolicyProtocol.TLS_V1_2_2021,
+        httpVersion: cloudfront.HttpVersion.HTTP2_AND_3,
+        priceClass: cloudfront.PriceClass.PRICE_CLASS_100,
+        defaultBehavior: {
+          origin: new origins.HttpOrigin(`${api.apiId}.execute-api.${this.region}.${this.urlSuffix}`, {
+            protocolPolicy: cloudfront.OriginProtocolPolicy.HTTPS_ONLY,
+            customHeaders: { "x-origin-verify": state.originVerifySecret.secretValueFromJson("ORIGIN_VERIFY_SECRET").unsafeUnwrap() },
+          }),
+          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.HTTPS_ONLY,
+          allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
+          cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
+          originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
+          responseHeadersPolicy: new cloudfront.ResponseHeadersPolicy(this, "ApiHeaders", {
+            comment: "HSTS and nosniff on every API response",
+            securityHeadersBehavior: {
+              strictTransportSecurity: { accessControlMaxAge: Duration.days(365), includeSubdomains: true, override: true },
+              contentTypeOptions: { override: true },
+            },
+          }),
+          functionAssociations: [
+            {
+              eventType: cloudfront.FunctionEventType.VIEWER_REQUEST,
+              function: new cloudfront.Function(this, "ViewerIp", {
+                code: cloudfront.FunctionCode.fromInline(VIEWER_IP_FUNCTION),
+                runtime: cloudfront.FunctionRuntime.JS_2_0,
+                comment: "Passes the visitor's address to the API in x-viewer-ip",
+              }),
+            },
+          ],
+        },
+      });
+      const zone = route53.HostedZone.fromHostedZoneAttributes(this, "Zone", { hostedZoneId: config.edge.hostedZoneId, zoneName: config.edge.zoneName });
+      const alias = route53.RecordTarget.fromAlias(new targets.CloudFrontTarget(distribution));
+      new route53.ARecord(this, "ApiAlias", { zone, recordName: config.edge.apiDomain, target: alias });
+      new route53.AaaaRecord(this, "ApiAliasIpv6", { zone, recordName: config.edge.apiDomain, target: alias });
+      new CfnOutput(this, "PublicApiUrl", {
+        value: `https://${config.edge.apiDomain}`,
+        description: "LQ_API_BASE for the widget, NEXT_PUBLIC_API_BASE_URL for the dashboard: through CloudFront and WAF",
+      });
+    }
+
+    new CfnOutput(this, "ApiUrl", { value: api.apiEndpoint, description: "API Gateway's own address. Behind CloudFront, use PublicApiUrl" });
     new CfnOutput(this, "UserPoolId", { value: state.userPool.userPoolId });
     new CfnOutput(this, "UserPoolClientId", { value: state.dashboardClient.userPoolClientId });
     new CfnOutput(this, "MigrateFunction", { value: migrate.functionName, description: "aws lambda invoke --function-name <this> out.json" });

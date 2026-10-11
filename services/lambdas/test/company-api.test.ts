@@ -6,6 +6,7 @@ import { routes } from "@lq/api-contract";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { BillingPage } from "../src/billing.js";
 import { createCompanyApi } from "../src/company/api.js";
+import { NO_EDGE } from "../src/public/edge.js";
 import { createEstimateHandler } from "../src/public/estimate.js";
 import { createSubmitHandler } from "../src/public/submit.js";
 import { createTokenCodec } from "../src/public/token.js";
@@ -50,6 +51,7 @@ beforeAll(async () => {
     billing: null,
     ipHashSalt: "pepper",
     widgetOrigin: null,
+    edge: NO_EDGE,
     log: () => {},
   };
   const estimate = createEstimateHandler(deps);

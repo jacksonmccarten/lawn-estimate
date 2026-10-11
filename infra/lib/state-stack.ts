@@ -50,6 +50,8 @@ export class StateStack extends Stack {
   readonly publicLogin: secretsmanager.Secret;
   /** TURNSTILE_SECRET, QUOTE_TOKEN_SECRET and IP_HASH_SALT, one secret each. */
   readonly appSecrets: secretsmanager.Secret[];
+  /** ORIGIN_VERIFY_SECRET: CloudFront sends it to the API, the public functions check it. */
+  readonly originVerifySecret: secretsmanager.Secret;
   readonly userPool: cognito.UserPool;
   readonly dashboardClient: cognito.UserPoolClient;
 
@@ -123,6 +125,7 @@ export class StateStack extends Stack {
       generated("QuoteTokenSecret", "QUOTE_TOKEN_SECRET"),
       generated("IpHashSalt", "IP_HASH_SALT"),
     ];
+    this.originVerifySecret = generated("OriginVerifySecret", "ORIGIN_VERIFY_SECRET");
 
     // Company owners and our own staff. Anyone may sign up; the address is
     // proved with an emailed code before the login can do anything, and a new

@@ -2,6 +2,8 @@
 // Content-Security-Policy of /w/[company] is set by the page itself.
 
 const nosniff = { key: "X-Content-Type-Options", value: "nosniff" };
+// HTTPS only, for a year, on every name under the domain.
+const hsts = { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" };
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -13,6 +15,7 @@ const nextConfig = {
   experimental: { extensionAlias: { ".js": [".ts", ".js"] } },
   async headers() {
     return [
+      { source: "/:path*", headers: [hsts] },
       {
         // docs/ENGINEERING_DESIGN.md section 12, caching contract.
         source: "/v1.js",
