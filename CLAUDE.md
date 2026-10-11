@@ -47,7 +47,7 @@ Source of truth for design decisions: `docs/ENGINEERING_DESIGN.md`. Legal, tax a
 - Never log PII (addresses, phones, emails). Log quote ids.
 - Mapbox calls come from the homeowner's browser and are not metered by us: watch usage in the Mapbox account. The Regrid meters (`usage_meters.regrid_lookups`, the 8,000/month cap) are dormant.
 - Pennsylvania seeds: services with taxable flags per 61 Pa. Code § 55.6; county tax rates 6% (7% Allegheny, 8% Philadelphia).
-- A service area is county regions plus zip regions, each with a region group; a zip region wins over a county region. A "service area" in the dashboard is a region group; one made there is only a set of zip regions sharing a group, made from zip-code centre points (`zip_centroid`), never from a geocoded address.
+- A service area is county regions plus zip regions, each with a region group; a zip region wins over a county region. The dashboard sets it as a business address and a radius (`PUT /service-area`): the zips whose centre points (`zip_centroid`) are within the radius of the address's zip, all in group `standard`. The address is typed, never geocoded.
 
 ## Build order
 
