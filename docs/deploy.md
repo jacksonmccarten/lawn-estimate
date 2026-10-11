@@ -143,6 +143,12 @@ breaks in between:
    `edge_bypassed` log lines stop.
 3. Set `originVerify` to `enforce`, deploy `LqApi`, run `npm run smoke`.
 
+The smoke test calls `/estimate` and `/submit` straight at API Gateway with the
+origin-verify header (it reads `OriginVerifySecret`), since WAF's Bot Control
+rightly blocks a script there; it checks separately that a scripted estimate
+at `api.instaquotesai.com` is stopped by WAF. Everything else goes through
+CloudFront.
+
 WAF's rules are in `infra/lib/edge-stack.ts`. Its cost: about $5 a month for
 the web ACL, $1 a month per rule, $10 a month for Bot Control, and per
 million requests on top.

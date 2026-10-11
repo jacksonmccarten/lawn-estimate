@@ -13,6 +13,7 @@
 import { createHmac, randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { CloudFormationClient, DescribeStacksCommand } from "@aws-sdk/client-cloudformation";
+import { GetSecretValueCommand, SecretsManagerClient } from "@aws-sdk/client-secrets-manager";
 import {
   AdminAddUserToGroupCommand,
   AdminConfirmSignUpCommand,
@@ -81,16 +82,29 @@ function signIn(pool: CognitoUserPool, email: string, password: string): Promise
 const [state, api] = [await outputs("LqState"), await outputs("LqApi")];
 // Through CloudFront and WAF when the API is behind them, as the front ends call it.
 const base = (api.PublicApiUrl ?? api.ApiUrl)!;
+// WAF's Bot Control blocks a script on /estimate and /submit, as it should. So
+// the homeowner's calls go straight to API Gateway, carrying the header only
+// CloudFront sends (read from Secrets Manager), which the functions accept
+// whether or not originVerify is enforced. WAF itself is checked separately.
+const originVerifyArn = Object.entries(state).find(([key]) => key.startsWith("ExportsOutputRefOriginVerifySecret"))?.[1];
+const originVerify =
+  api.PublicApiUrl && originVerifyArn
+    ? (JSON.parse(
+        (await new SecretsManagerClient({ region }).send(new GetSecretValueCommand({ SecretId: originVerifyArn }))).SecretString ?? "{}",
+      ) as { ORIGIN_VERIFY_SECRET?: string }).ORIGIN_VERIFY_SECRET
+    : undefined;
+const homeownerBase = originVerify ? api.ApiUrl! : base;
 const widget = context.widgetOrigin!;
 const cognito = new CognitoIdentityProviderClient({ region });
 const owner = new DataApiDbClient({ resourceArn: state.DatabaseClusterArn!, secretArn: state.OwnerLoginArn!, database: "lawnquote" });
 const email = `smoke-${randomBytes(4).toString("hex")}@example.com`;
 const password = `${randomBytes(12).toString("base64url")}aA1`;
 
-const call = async (method: string, path: string, options: { body?: unknown; token?: string; origin?: string } = {}) => {
-  const res = await fetch(base + path, {
+const call = async (method: string, path: string, options: { body?: unknown; token?: string; origin?: string; direct?: boolean } = {}) => {
+  const res = await fetch((options.direct ? homeownerBase : base) + path, {
     method,
     headers: {
+      ...(options.direct && originVerify ? { "x-origin-verify": originVerify } : {}),
       ...(options.body !== undefined ? { "content-type": "application/json" } : {}),
       ...(options.token ? { authorization: `Bearer ${options.token}` } : {}),
       ...(options.origin ? { origin: options.origin } : {}),
@@ -111,7 +125,7 @@ try {
   const profile = await call("GET", `/profile/${DEMO_SLUG}`);
   check("public profile", profile.status === 200 && profile.body?.slug === DEMO_SLUG, `${profile.status}`);
   check("an unknown company is a 404", (await call("GET", "/profile/no-such-company")).status === 404);
-  check("another origin may not ask for an estimate", (await call("POST", "/estimate", { body: {}, origin: "https://evil.example" })).status === 403);
+  check("another origin may not ask for an estimate", (await call("POST", "/estimate", { body: {}, origin: "https://evil.example", direct: true })).status === 403);
   if (api.PublicApiUrl && context.originVerify === "enforce") {
     // Straight to API Gateway, around CloudFront and WAF.
     const direct = await fetch(`${api.ApiUrl}/profile/${DEMO_SLUG}`);
@@ -120,7 +134,13 @@ try {
 
   const address = `1 Smoke Test Ln, State College, PA 16801 (${email})`;
   const common = { turnstile: "smoke-test-token", embedOrigin: null };
+  if (originVerify) {
+    // Through CloudFront, a script asking for an estimate is a bot, and WAF says no before the API is reached.
+    const scripted = await fetch(`${base}/estimate`, { method: "POST", headers: { "content-type": "application/json", origin: widget }, body: "{}" });
+    check("WAF stops a scripted estimate at the public address", scripted.status === 403, `${scripted.status}`);
+  }
   const estimate = await call("POST", "/estimate", {
+    direct: true,
     origin: widget,
     body: { company: DEMO_SLUG, address, service: "mow", manual: { zip: "16801", size: { kind: "drawn", sqft: 6449 } }, ...common },
   });
@@ -131,6 +151,7 @@ try {
     JSON.stringify(estimate.body).slice(0, 160),
   );
   const submit = await call("POST", "/submit", {
+    direct: true,
     origin: widget,
     body: { token: estimate.body?.token, contact: { name: "Smoke Test", email: "smoke@example.com" }, ...common },
   });
