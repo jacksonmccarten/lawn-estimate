@@ -7,7 +7,7 @@
 import { ContactRequest, ContactResponse } from "@lq/api-contract";
 import { HttpError, json, parseBody, respond, validate, type HttpEvent, type HttpResult } from "../http.js";
 import type { Log } from "../log.js";
-import { sourceIp } from "./deps.js";
+import { throughEdge, type Edge } from "./edge.js";
 import type { EmailMessage } from "./notify.js";
 import { isHoneypotHit } from "./submit.js";
 import type { TurnstileVerify } from "./turnstile.js";
@@ -18,6 +18,8 @@ export type ContactDeps = {
   inbox: { to: string; send: (message: EmailMessage) => Promise<void> } | null;
   /** The website's own origin (the dashboard app). When set, calls from anywhere else are refused. */
   siteOrigin: string | null;
+  /** CloudFront in front of the API, as for the other public routes. */
+  edge: Edge;
   log: Log;
 };
 
@@ -31,6 +33,7 @@ export function renderContactEmail(req: Pick<ContactRequest, "name" | "email" | 
 export function createContactHandler(deps: ContactDeps) {
   return (event: HttpEvent): Promise<HttpResult> =>
     respond(async () => {
+      const { ip } = throughEdge(deps.edge, event, deps.log);
       if (deps.siteOrigin !== null && event.headers?.origin !== deps.siteOrigin) {
         deps.log("warn", "origin_refused", { check: "site" });
         throw new HttpError("origin_not_allowed", "this origin may not call the contact form");
@@ -46,7 +49,7 @@ export function createContactHandler(deps: ContactDeps) {
         deps.log("warn", "contact_not_configured");
         throw new HttpError("contact_unavailable", "the contact form has no inbox configured");
       }
-      const verdict = await deps.turnstile(req.turnstile, sourceIp(event));
+      const verdict = await deps.turnstile(req.turnstile, ip);
       if (verdict === "failed") throw new HttpError("turnstile_failed", "the Turnstile check failed");
       if (verdict === "unavailable") deps.log("warn", "turnstile_unavailable", { route: "contact" });
 

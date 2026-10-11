@@ -5,13 +5,16 @@
 import { Origin, PublicProfile, Theme } from "@lq/api-contract";
 import type { WithPublic } from "@lq/db";
 import { fromJson, json, respond, type HttpEvent, type HttpResult } from "../http.js";
+import type { Log } from "../log.js";
+import { NO_EDGE, throughEdge, type Edge } from "./edge.js";
 
 /** How long a shared cache may hold a profile; the widget page uses the same figure. */
 const MAX_AGE_SECONDS = 60;
 
-export function createProfileHandler(deps: { withPublic: WithPublic }) {
+export function createProfileHandler(deps: { withPublic: WithPublic; edge?: Edge; log?: Log }) {
   return (event: HttpEvent): Promise<HttpResult> =>
     respond(async () => {
+      throughEdge(deps.edge ?? NO_EDGE, event, deps.log ?? (() => {}));
       // An unknown or malformed slug is withPublic's UnknownCompanyError: a 404.
       const slug = event.pathParameters?.company ?? "";
       const body = await deps.withPublic(slug, async (tx, company) => {

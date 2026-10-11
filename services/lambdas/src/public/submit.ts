@@ -5,7 +5,8 @@ import { randomUUID } from "node:crypto";
 import { SubmitRequest, SubmitResponse } from "@lq/api-contract";
 import { HttpError, json, parseBody, respond, validate, type HttpEvent, type HttpResult } from "../http.js";
 import * as db from "./db.js";
-import { embedOriginRefused, requireWidgetOrigin, sourceIp, type PublicDeps } from "./deps.js";
+import { embedOriginRefused, requireWidgetOrigin, type PublicDeps } from "./deps.js";
+import { throughEdge } from "./edge.js";
 
 /** The honeypot field holds something: a bot. Exported for the tests. */
 export function isHoneypotHit(body: unknown): boolean {
@@ -16,6 +17,7 @@ export function isHoneypotHit(body: unknown): boolean {
 export function createSubmitHandler(deps: PublicDeps) {
   return (event: HttpEvent): Promise<HttpResult> =>
     respond(async () => {
+      const { ip } = throughEdge(deps.edge, event, deps.log);
       requireWidgetOrigin(deps, event);
       const body = parseBody(event);
       if (isHoneypotHit(body)) {
@@ -29,7 +31,7 @@ export function createSubmitHandler(deps: PublicDeps) {
       // An outage at Cloudflare does not cost the company a lead (design
       // section 10): the signed token, the honeypot, the dedupe and the SMS
       // cap still stand. A token Cloudflare rejects is refused.
-      const verdict = await deps.turnstile(req.turnstile, sourceIp(event));
+      const verdict = await deps.turnstile(req.turnstile, ip);
       if (verdict === "failed") throw new HttpError("turnstile_failed", "the Turnstile check failed");
       if (verdict === "unavailable") deps.log("warn", "turnstile_unavailable", { route: "submit" });
 

@@ -4,9 +4,12 @@
 //
 // Environment:
 //   SECRETS_ARN            JSON secrets, comma-separated, that between them hold
-//                          TURNSTILE_SECRET, QUOTE_TOKEN_SECRET and
-//                          IP_HASH_SALT. Each may be set directly in the
-//                          environment instead (local runs).
+//                          TURNSTILE_SECRET, QUOTE_TOKEN_SECRET, IP_HASH_SALT
+//                          and ORIGIN_VERIFY_SECRET. Each may be set directly
+//                          in the environment instead (local runs).
+//   ORIGIN_VERIFY_ENFORCE  "true": refuse public requests that did not come
+//                          through CloudFront (public/edge.ts). Without
+//                          ORIGIN_VERIFY_SECRET nothing is checked.
 //   DB_RESOURCE_ARN, DB_NAME, DB_PUBLIC_SECRET_ARN, DB_RW_SECRET_ARN
 //                          Aurora through the Data API, as app_public and app_rw.
 //   DATABASE_URL_PUBLIC, DATABASE_URL_RW
@@ -30,6 +33,7 @@ import { billingFromEnv } from "./billing.js";
 import { createCompanyApi } from "./company/api.js";
 import { log } from "./log.js";
 import type { PublicDeps } from "./public/deps.js";
+import type { Edge } from "./public/edge.js";
 import { createEstimateHandler } from "./public/estimate.js";
 import { createContactHandler } from "./public/contact.js";
 import { createNotifier, type EmailMessage } from "./public/notify.js";
@@ -67,6 +71,10 @@ async function dbClient(env: Env, role: "PUBLIC" | "RW"): Promise<DbClient> {
     secretArn: required(env, `DB_${role}_SECRET_ARN`),
     database: required(env, "DB_NAME"),
   });
+}
+
+function edgeFrom(env: Env): Edge {
+  return { secret: env.ORIGIN_VERIFY_SECRET || null, enforce: env.ORIGIN_VERIFY_ENFORCE === "true" };
 }
 
 function sesSender(from: string): (message: EmailMessage) => Promise<void> {
@@ -114,6 +122,7 @@ async function publicDeps(): Promise<PublicDeps> {
     billing: await billingFromEnv(env, log),
     ipHashSalt: required(env, "IP_HASH_SALT"),
     widgetOrigin: env.WIDGET_ORIGIN ?? null,
+    edge: edgeFrom(env),
     log,
   };
 }
@@ -134,13 +143,15 @@ export const contact = lazy(async () => {
     turnstile: createTurnstile({ secret: required(env, "TURNSTILE_SECRET") }),
     inbox: to ? { to, send: sesSender(required(env, "SES_FROM")) } : null,
     siteOrigin: env.SITE_ORIGIN ?? null,
+    edge: edgeFrom(env),
     log,
   });
 });
-// Needs the database only, so it does not wait on the secrets the other two read.
-export const profile = lazy(async () =>
-  createProfileHandler({ withPublic: createWithPublic(await dbClient(process.env, "PUBLIC")) }),
-);
+// The database, and the origin-verify secret only.
+export const profile = lazy(async () => {
+  const env = await loadEnv();
+  return createProfileHandler({ withPublic: createWithPublic(await dbClient(env, "PUBLIC")), edge: edgeFrom(env), log });
+});
 export const companyApi = lazy(async () => {
   const db = await dbClient(process.env, "RW");
   return createCompanyApi({

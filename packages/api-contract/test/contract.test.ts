@@ -310,11 +310,11 @@ describe("company-api", () => {
 });
 
 describe("routes", () => {
-  it("lists every route once, public ones only for estimate, submit and the profile", () => {
+  it("lists every route once, public ones only for estimate, submit, the website contact form and the profile", () => {
     const list = Object.values(routes);
     const keys = list.map((r) => `${r.method} ${r.path}`);
     expect(new Set(keys).size).toBe(keys.length);
-    expect(list.filter((r) => r.auth === "public").map((r) => r.path)).toEqual(["/estimate", "/submit", "/profile/{company}"]);
+    expect(list.filter((r) => r.auth === "public").map((r) => r.path)).toEqual(["/estimate", "/submit", "/contact", "/profile/{company}"]);
     for (const route of list) {
       expect(route.response, route.path).toBeInstanceOf(z.ZodType);
       if (route.method !== "GET") expect("request" in route, route.path).toBe(true);

@@ -3,6 +3,20 @@
 
 import type { App } from "aws-cdk-lib";
 
+/** CloudFront and WAF in front of the API, at a name of our own (design section 9). */
+export type EdgeConfig = {
+  /** The Route 53 hosted zone the names are in. */
+  zoneName: string;
+  hostedZoneId: string;
+  /** The API's own name, e.g. api.example.com. */
+  apiDomain: string;
+  /**
+   * "log": a public request that skipped CloudFront is logged and served
+   * (while the front ends move to apiDomain). "enforce": it is refused.
+   */
+  originVerify: "log" | "enforce";
+};
+
 export type Config = {
   /** Where the stacks go. The Amplify apps are in us-east-2, so the API is too. */
   region: string;
@@ -23,6 +37,8 @@ export type Config = {
    * test copy) and the service endpoint. Both or neither; unset, the functions run without billing.
    */
   monetization?: { appId: string; endpoint: string };
+  /** Absent: no CloudFront, the API is reached at its execute-api address. */
+  edge?: EdgeConfig;
 };
 
 const ORIGIN = /^https:\/\/[a-z0-9.-]+(:\d{1,5})?$/;
@@ -64,6 +80,18 @@ export function readConfig(app: App): Config {
     throw new Error('context "monetizationEndpoint" must be an https origin with no path');
   }
   const monetization = monetizationAppId && monetizationEndpoint ? { appId: monetizationAppId, endpoint: monetizationEndpoint } : undefined;
+  let edge: EdgeConfig | undefined;
+  const apiDomain = optional("apiDomain");
+  if (apiDomain !== undefined) {
+    const zoneName = text("zoneName");
+    if (!/^([a-z0-9-]+\.)+[a-z]{2,}$/.test(zoneName)) throw new Error('context "zoneName" must be a domain name, like example.com');
+    if (!apiDomain.endsWith(`.${zoneName}`)) throw new Error(`context "apiDomain" must be a name in ${zoneName}`);
+    const hostedZoneId = text("hostedZoneId");
+    if (!/^Z[A-Z0-9]{5,31}$/.test(hostedZoneId)) throw new Error('context "hostedZoneId" must be a Route 53 hosted zone id');
+    const originVerify = text("originVerify");
+    if (originVerify !== "log" && originVerify !== "enforce") throw new Error('context "originVerify" must be "log" or "enforce"');
+    edge = { zoneName, hostedZoneId, apiDomain, originVerify };
+  }
   return {
     region: text("region"),
     widgetOrigin: origin("widgetOrigin"),
@@ -73,5 +101,6 @@ export function readConfig(app: App): Config {
     databaseSnapshot,
     databaseClusterArn,
     monetization,
+    ...(edge ? { edge } : {}),
   };
 }

@@ -16,6 +16,7 @@ import {
   round100,
   zipFromAddress,
 } from "../src/public/grass.js";
+import { NO_EDGE, throughEdge } from "../src/public/edge.js";
 import { createContactHandler, renderContactEmail } from "../src/public/contact.js";
 import { createNotifier, renderLeadEmail, renderLeadSms, type LeadAlert } from "../src/public/notify.js";
 import { createRegridLookup, parseAddressResponse } from "../src/public/regrid.js";
@@ -389,6 +390,38 @@ describe("billing through AWS Monetization", () => {
   });
 });
 
+describe("the CloudFront edge check", () => {
+  const SECRET = "s".repeat(40);
+  const logged: string[] = [];
+  const log = (_level: string, name: string) => void logged.push(name);
+  const viaEdge = { "x-origin-verify": SECRET, "x-viewer-ip": "198.51.100.9" };
+
+  it("reads nothing and uses API Gateway's address when no secret is configured", () => {
+    expect(throughEdge(NO_EDGE, event({ headers: viaEdge, ip: "203.0.113.7" }), log)).toEqual({ ip: "203.0.113.7" });
+  });
+
+  it("takes the visitor's address from CloudFront's header when the secret matches", () => {
+    expect(throughEdge({ secret: SECRET, enforce: true }, event({ headers: viaEdge, ip: "203.0.113.7" }), log)).toEqual({ ip: "198.51.100.9" });
+  });
+
+  it("ignores a viewer-ip header on a request that did not come through CloudFront", () => {
+    logged.length = 0;
+    const spoofed = event({ headers: { "x-origin-verify": "wrong", "x-viewer-ip": "198.51.100.9" }, ip: "203.0.113.7" });
+    expect(throughEdge({ secret: SECRET, enforce: false }, spoofed, log)).toEqual({ ip: "203.0.113.7" });
+    expect(logged).toEqual(["edge_bypassed"]);
+  });
+
+  it("refuses a request that skipped CloudFront once enforced", () => {
+    const direct = event({ ip: "203.0.113.7" });
+    expect(() => throughEdge({ secret: SECRET, enforce: true }, direct, log)).toThrow(HttpError);
+    try {
+      throughEdge({ secret: SECRET, enforce: true }, direct, log);
+    } catch (error) {
+      expect((error as HttpError).code).toBe("forbidden");
+    }
+  });
+});
+
 describe("POST /contact", () => {
   const SITE = "https://app.example.com";
   const good = { name: "Pat Doe", email: "pat@example.com", message: "Do you work with snow removal companies?", turnstile: "tok" };
@@ -408,6 +441,7 @@ describe("POST /contact", () => {
               },
             },
       siteOrigin: SITE,
+      edge: NO_EDGE,
       log: (level, ev, fields) => logs.push({ level, event: ev, fields }),
     });
     const post = async (body: unknown, origin = SITE) => read(await handler(event({ routeKey: "POST /contact", body, headers: { origin } })));

@@ -16,6 +16,7 @@ import { createCompanyApi } from "../src/company/api.js";
 import type { HttpEvent, HttpResult } from "../src/http.js";
 import { log } from "../src/log.js";
 import type { PublicDeps } from "../src/public/deps.js";
+import { NO_EDGE } from "../src/public/edge.js";
 import { createContactHandler } from "../src/public/contact.js";
 import { createEstimateHandler } from "../src/public/estimate.js";
 import { createNotifier } from "../src/public/notify.js";
@@ -61,6 +62,8 @@ const publicDeps: PublicDeps = {
   billing,
   ipHashSalt: env.ipHashSalt,
   widgetOrigin: env.widgetOrigin,
+  // No CloudFront locally.
+  edge: NO_EDGE,
   log,
 };
 
@@ -68,7 +71,7 @@ const estimate = createEstimateHandler(publicDeps);
 const submit = createSubmitHandler(publicDeps);
 const profile = createProfileHandler({ withPublic });
 // No SES locally: the contact form answers contact_unavailable, as it does in an environment with no inbox.
-const contact = createContactHandler({ turnstile: publicDeps.turnstile, inbox: null, siteOrigin: null, log });
+const contact = createContactHandler({ turnstile: publicDeps.turnstile, inbox: null, siteOrigin: null, edge: NO_EDGE, log });
 const companyApi = createCompanyApi({ withCompany, signUp: createWithSignup(rw), billing, dashboardOrigin: env.dashboardOrigin });
 
 type Handler = (event: HttpEvent) => Promise<HttpResult>;

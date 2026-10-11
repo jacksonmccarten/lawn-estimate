@@ -7,6 +7,7 @@ import type { WithPublic } from "@lq/db";
 import type { Billing } from "../billing.js";
 import { HttpError, type HttpEvent } from "../http.js";
 import type { Log } from "../log.js";
+import type { Edge } from "./edge.js";
 import type { Notifier } from "./notify.js";
 import type { RegridLookup } from "./regrid.js";
 import type { TokenCodec } from "./token.js";
@@ -25,12 +26,10 @@ export type PublicDeps = {
   ipHashSalt: string;
   /** The widget app's own origin (https://w.<domain>). When set, calls from anywhere else are refused. */
   widgetOrigin: string | null;
+  /** CloudFront in front of the API: the origin-verify secret and whether it is enforced. */
+  edge: Edge;
   log: Log;
 };
-
-export function sourceIp(event: HttpEvent): string | null {
-  return event.requestContext?.http?.sourceIp ?? null;
-}
 
 export function hashIp(salt: string, ip: string | null): string | null {
   return ip === null ? null : createHmac("sha256", salt).update(ip).digest("hex");

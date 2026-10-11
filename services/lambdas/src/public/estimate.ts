@@ -14,7 +14,8 @@ import { priceQuote, type Quote } from "@lq/pricing";
 import type { z } from "zod";
 import { HttpError, json, parseBody, respond, validate, type HttpEvent, type HttpResult } from "../http.js";
 import * as db from "./db.js";
-import { embedOriginRefused, hashIp, requireWidgetOrigin, sourceIp, type PublicDeps } from "./deps.js";
+import { embedOriginRefused, hashIp, requireWidgetOrigin, type PublicDeps } from "./deps.js";
+import { throughEdge } from "./edge.js";
 import {
   adjustGrass,
   grassFromManual,
@@ -280,10 +281,10 @@ async function adjust(deps: PublicDeps, req: AdjustRequest): Promise<Response> {
 export function createEstimateHandler(deps: PublicDeps) {
   return (event: HttpEvent): Promise<HttpResult> =>
     respond(async () => {
+      const { ip } = throughEdge(deps.edge, event, deps.log);
       requireWidgetOrigin(deps, event);
       const req = validate(EstimateRequest, parseBody(event));
 
-      const ip = sourceIp(event);
       const verdict = await deps.turnstile(req.turnstile, ip);
       if (verdict === "failed") throw new HttpError("turnstile_failed", "the Turnstile check failed");
       if (verdict === "unavailable") deps.log("warn", "turnstile_unavailable", { route: "estimate" });

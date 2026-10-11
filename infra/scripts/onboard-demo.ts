@@ -76,4 +76,4 @@ console.log(`company ${DEMO_SLUG}: ${result}`);
 if (!login.password) console.log(`login ${email} already existed; password unchanged`);
 console.log(`dashboard: ${context.dashboardOrigin}`);
 console.log(`widget:    ${context.widgetOrigin}/w/${DEMO_SLUG}`);
-console.log(`api:       ${api.ApiUrl}`);
+console.log(`api:       ${api.PublicApiUrl ?? api.ApiUrl}`);

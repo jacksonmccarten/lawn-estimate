@@ -15,10 +15,15 @@ every push to `main`. The design is in [[ENGINEERING_DESIGN]] (Decisions:
 | --- | --- | --- |
 | Stack `LqState` | CDK | The database (Aurora PostgreSQL 17, serverless, pauses to zero, Data API on, deletion protection on, 7-day backups) in a VPC of two isolated subnets with no route out, encrypted with the stack's KMS key; a login secret for each database role, the three application secrets, the Cognito user pool. Termination protection on; the user pool and the key are retained, the database leaves a snapshot if it is ever removed |
 | Aurora cluster `lq-db` | `npm run bootstrap-db`, on the free plan | The old cluster, outside the VPC and unencrypted. Kept, unused, until the move is confirmed; then delete it (below) |
-| Stack `LqApi` | CDK | The HTTP API, its routes (from `packages/api-contract`), five Lambdas. Stateless; safe to delete and deploy again |
+| Stack `LqApi` | CDK | The HTTP API, its routes (from `packages/api-contract`), five Lambdas, and the CloudFront distribution in front of them at `api.instaquotesai.com`. Stateless; safe to delete and deploy again |
+| Stack `LqEdge` (us-east-1) | CDK | What CloudFront reads from us-east-1: the API's certificate and the WAF web ACL |
 
-Not created yet: CloudFront and WAF in front of the API, the nightly cleanup
-job, alarms, and custom domains.
+Not created yet: the nightly cleanup job and alarms.
+
+The front ends' names are Amplify custom domains, set in the Amplify console:
+the dashboard at `instaquotesai.com` (and `www.`), the widget at
+`w.instaquotesai.com`, which also serves `v1.js`. The domain is registered in
+Route 53, in this account.
 
 The account is on a paid plan (since 2026-10-11).
 
@@ -36,6 +41,9 @@ The account is on a paid plan (since 2026-10-11).
 | `contactTo` | Optional. Where the website contact form is emailed; unset, the form says it is unavailable |
 | `monetizationAppId` | The AWS Monetization app that sells companies their plan. Its ARN, ending in `/sandbox` for the test copy (test cards, no real charges). Set with `monetizationEndpoint`, or leave both out to run without billing |
 | `monetizationEndpoint` | The AWS Monetization endpoint, as in `.env.monetization` |
+| `zoneName`, `hostedZoneId` | The Route 53 zone the API's name is made in |
+| `apiDomain` | The API's public name, served by CloudFront behind WAF. Without it there is no CloudFront |
+| `originVerify` | `log` or `enforce`: whether a public request that skipped CloudFront (straight to `execute-api`) is only logged, or refused |
 
 Override any of them for one command with `-c name=value`.
 
@@ -118,6 +126,26 @@ Once the new cluster has served for a while, delete the old one and its
 snapshots by hand:
 `aws rds modify-db-cluster --db-cluster-identifier lq-db --no-deletion-protection --apply-immediately`,
 then `aws rds delete-db-cluster --db-cluster-identifier lq-db --final-db-snapshot-identifier lq-db-final`.
+
+## CloudFront and WAF in front of the API
+
+The public routes check a header only CloudFront sends (the
+`OriginVerifySecret` in `LqState`), so WAF cannot be walked around by
+calling API Gateway's own address; a CloudFront Function passes the
+visitor's address in `x-viewer-ip`. Turned on in two steps, so nothing
+breaks in between:
+
+1. With `originVerify` at `log`: `npx cdk deploy LqState LqEdge LqApi`. The
+   API answers at both addresses. (`cdk bootstrap` was run for us-east-1
+   once, for `LqEdge`.)
+2. Point the front ends at `PublicApiUrl` (`LQ_API_BASE` on the widget,
+   `NEXT_PUBLIC_API_BASE_URL` on the dashboard) and rebuild them. Watch the
+   `edge_bypassed` log lines stop.
+3. Set `originVerify` to `enforce`, deploy `LqApi`, run `npm run smoke`.
+
+WAF's rules are in `infra/lib/edge-stack.ts`. Its cost: about $5 a month for
+the web ACL, $1 a month per rule, $10 a month for Bot Control, and per
+million requests on top.
 
 ## Later deploys
 
