@@ -490,9 +490,9 @@ test.describe("the page and its headers", () => {
     expect(html).toContain("Joe&#x27;s Lawn Care");
   });
 
-  test("an allowlist of nothing allows only the hosted page", async ({ request }) => {
+  test("an allowlist of nothing lets any site embed the widget", async ({ request }) => {
     const csp = (await request.get("/w/sunny-yards")).headers()["content-security-policy"]!;
-    expect(csp).toMatch(/; frame-ancestors 'self'$/);
+    expect(csp).toMatch(/; frame-ancestors \*$/);
   });
 
   test("an unknown company is a 404 that cannot be framed either", async ({ request }) => {

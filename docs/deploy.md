@@ -60,9 +60,9 @@ token, which is never committed:
 
 Plans are drafts until published (the AWS Monetization console, or `/monetize
 live`). A paid plan publishes only once seller registration is `ACTIVE`. The
-beta's payments go to a test Stripe Connect account and may not be used for
-production: keep `monetizationAppId` on the `/sandbox` ARN until AWS
-Monetization is generally available.
+functions point at the live app: real companies pay real money. To test a
+change without charging anyone, deploy with
+`-c monetizationAppId=<the live ARN>/sandbox`.
 
 ## First deploy
 

@@ -83,7 +83,7 @@ test("a forced sign-out keeps unsaved pricing changes and returns to them", asyn
   await expect(page.getByRole("heading", { level: 1, name: "Version 3, draft" })).toBeVisible();
   const draftUrl = page.url();
 
-  await page.getByLabel("Minimum charge, in dollars").fill("61.00");
+  await page.getByLabel("Category 1, flat rate in dollars").fill("61.00");
   await expect(page.getByText("You have unsaved changes.")).toBeVisible();
 
   // No clicks or keys for the whole session: the warning, then the sign-out.
@@ -101,8 +101,8 @@ test("a forced sign-out keeps unsaved pricing changes and returns to them", asyn
 
   await expect(page).toHaveURL(draftUrl);
   await expect(page.getByText("Unsaved changes from earlier in this browser tab were restored")).toBeVisible();
-  await expect(page.getByLabel("Minimum charge, in dollars")).toHaveValue("61.00");
+  await expect(page.getByLabel("Category 1, flat rate in dollars")).toHaveValue("61.00");
   // Discarding goes back to what the server has: the value copied from version 2.
   await page.getByRole("button", { name: "Discard them" }).click();
-  await expect(page.getByLabel("Minimum charge, in dollars")).toHaveValue("45.00");
+  await expect(page.getByLabel("Category 1, flat rate in dollars")).toHaveValue("45.00");
 });

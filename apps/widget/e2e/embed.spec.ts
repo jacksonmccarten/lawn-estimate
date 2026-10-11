@@ -133,11 +133,9 @@ test.describe("frame-ancestors", () => {
     problems.length = 0;
   });
 
-  test("blocks every embed when the company's list is empty, while its hosted page works", async ({ page, problems }) => {
-    await openHost(page, { company: "sunny-yards", expectBlocked: true });
-    await expect.poll(() => problems.join("\n")).toContain("frame-ancestors");
-    await expect(page.frameLocator("iframe").getByRole("heading", { level: 1, name: "Get an instant lawn estimate" })).toHaveCount(0);
-    problems.length = 0;
+  test("allows any site when the company's list is empty, and its hosted page works", async ({ page }) => {
+    await openHost(page, { company: "sunny-yards", origin: OTHER_HOST });
+    await expect(page.frameLocator("iframe").getByRole("heading", { level: 1, name: "Get an instant lawn estimate" })).toBeVisible();
 
     await page.goto("/w/sunny-yards");
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("Get an instant lawn estimate");

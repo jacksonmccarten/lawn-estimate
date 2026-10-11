@@ -1,9 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { parseCsv } from "@/lib/csv";
 import { centsToInput, formatBps, parseDollars, parseRatePer1000, parseWholeNumber, rateToInput } from "@/lib/money";
 import { PA_COUNTIES } from "@/lib/pa-counties";
-import { fieldId, fromForm, sameForm, toForm, type PricingForm } from "@/lib/pricing-form";
-import { parseTiersCsv, TIER_CSV_TEMPLATE } from "@/lib/tiers-csv";
+import { fieldId, fromForm, OPEN_END_SQFT, rangeLabel, sameForm, toForm } from "@/lib/pricing-form";
 import { findOverlaps } from "@/lib/tiers";
 import { brandColorUse, contrastRatio } from "@/lib/contrast";
 import { dark, light, pairings } from "@/lib/tokens";
@@ -51,17 +49,6 @@ describe("money", () => {
   });
 });
 
-describe("parseCsv", () => {
-  it("reads quoted fields, doubled quotes, CRLF and a byte-order mark", () => {
-    const result = parseCsv('﻿a,b\r\n"x, y","say ""hi"""\r\n\r\n1,2');
-    expect(result).toEqual({ ok: true, rows: [["a", "b"], ["x, y", 'say "hi"'], ["1", "2"]] });
-  });
-
-  it("reports an unclosed quote with its line", () => {
-    expect(parseCsv('a,b\n1,"oops\n2,3')).toEqual({ ok: false, line: 2, problem: "A quoted value is never closed" });
-  });
-});
-
 describe("findOverlaps", () => {
   const tier = (minSqft: number, maxSqft: number, regionGroup = "core") => ({ serviceCode: "mow", regionGroup, minSqft, maxSqft, pricePerSqftMicrocents: null, flatPriceCents: 100 });
 
@@ -74,123 +61,94 @@ describe("findOverlaps", () => {
   });
 });
 
-describe("parseTiersCsv", () => {
-  const services = ["mow", "aerate"];
-
-  it("imports the template", () => {
-    const result = parseTiersCsv(TIER_CSV_TEMPLATE, services);
-    expect(result).toEqual({
-      ok: true,
-      tiers: [
-        { serviceCode: "mow", regionGroup: "core", minSqft: 0, maxSqft: 5000, pricePerSqftMicrocents: null, flatPriceCents: 4500 },
-        { serviceCode: "mow", regionGroup: "core", minSqft: 5000, maxSqft: 10000, pricePerSqftMicrocents: 750_000, flatPriceCents: null },
-        { serviceCode: "mow", regionGroup: "outer", minSqft: 0, maxSqft: 5000, pricePerSqftMicrocents: null, flatPriceCents: 5500 },
-      ],
-    });
-  });
-
-  it("accepts columns in any order and any case", () => {
-    const result = parseTiersCsv("Flat_Price,MAX_SQFT,min_sqft,region_group,service_code,price_per_1000_sqft\n90,20000,0,core,aerate,", services);
-    expect(result.ok).toBe(true);
-  });
-
-  it("reports every problem with its row and column, and imports nothing", () => {
-    const csv = [
-      "service_code,region_group,min_sqft,max_sqft,price_per_1000_sqft,flat_price",
-      "snow,core,0,5000,,45",
-      "mow,,x,5000,,45",
-      "mow,core,5000,5000,7.50,45",
-      "mow,core,0,100,,",
-    ].join("\n");
-    const result = parseTiersCsv(csv, services);
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-    expect(result.problems.map((p) => [p.row, p.column])).toEqual([
-      [2, "service_code"],
-      [3, "region_group"],
-      [3, "min_sqft"],
-      [4, "max_sqft"],
-      [4, "flat_price"],
-      [5, "flat_price"],
-    ]);
-  });
-
-  it("reports overlapping rows", () => {
-    const csv = "service_code,region_group,min_sqft,max_sqft,price_per_1000_sqft,flat_price\nmow,core,0,5000,,45\nmow,core,4000,8000,,60";
-    const result = parseTiersCsv(csv, services);
-    expect(result).toEqual({ ok: false, problems: [{ row: 3, column: "min_sqft", problem: "This range overlaps row 2 for the same service and region group" }] });
-  });
-
-  it("reports a missing or unknown header, and an empty file", () => {
-    const missing = parseTiersCsv("service_code,region_group,min_sqft,max_sqft,flat_price,notes\nmow,core,0,1,1,x", services);
-    expect(missing.ok).toBe(false);
-    if (!missing.ok) expect(missing.problems.map((p) => p.column)).toEqual(["price_per_1000_sqft", "notes"]);
-    expect(parseTiersCsv("", services).ok).toBe(false);
-    expect(parseTiersCsv(TIER_CSV_TEMPLATE.split("\r\n")[0]!, services).ok).toBe(false);
-  });
-});
-
 describe("pricing form", () => {
+  const flat = (minSqft: number, maxSqft: number, cents: number, regionGroup = "standard") => ({
+    serviceCode: "mow",
+    regionGroup,
+    minSqft,
+    maxSqft,
+    pricePerSqftMicrocents: null,
+    flatPriceCents: cents,
+  });
   const content = {
-    minChargeCents: 4500,
-    coverageFactor: 0.7,
-    services: [
-      { code: "mow", name: "Mowing", taxable: true, season: "growing" as const },
-      { code: "leaf_raking", name: "Leaf raking", taxable: false, season: "growing" as const },
-    ],
-    tiers: [
-      { serviceCode: "mow", regionGroup: "core", minSqft: 0, maxSqft: 5000, pricePerSqftMicrocents: null, flatPriceCents: 4500 },
-      { serviceCode: "mow", regionGroup: "core", minSqft: 5000, maxSqft: 10000, pricePerSqftMicrocents: 750_000, flatPriceCents: null },
-    ],
+    minChargeCents: 0,
+    coverageFactor: 1,
+    services: [{ code: "mow", name: "Mowing", taxable: true, season: "growing" as const }],
+    tiers: [flat(0, 2500, 4500), flat(2500, 5000, 5000), flat(5000, OPEN_END_SQFT, 6000)],
   };
 
-  it("round-trips a version's content exactly", () => {
-    expect(fromForm(toForm(content))).toEqual({ ok: true, content });
+  it("round-trips flat-rate categories exactly", () => {
+    expect(fromForm(toForm(content), content, ["standard"])).toEqual({ ok: true, content });
   });
 
-  it("names each problem by its field", () => {
-    const form: PricingForm = toForm(content);
-    form.minCharge = "lots";
-    form.services[1]!.taxable = "";
-    form.tiers[1]!.minSqft = "4000";
-    form.tiers[0]!.price = "";
-    const result = fromForm(form);
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-    expect(result.errors.map((e) => e.fieldId)).toEqual([
-      fieldId.minCharge,
-      fieldId.service(form.services[1]!.key, "taxable"),
-      fieldId.tier(form.tiers[0]!.key, "price"),
+  it("starts a new version with the example categories", () => {
+    const form = toForm({ ...content, tiers: [] });
+    expect(form.categories.map((c) => [c.upTo, c.price])).toEqual([
+      ["2500", "45.00"],
+      ["5000", "50.00"],
+      ["10000", "60.00"],
+      ["15000", "75.00"],
+      [String(OPEN_END_SQFT), "90.00"],
     ]);
   });
 
-  it("has no default for a service's tax treatment (R1)", () => {
-    const form = toForm({ ...content, tiers: [] });
-    form.services.push({ key: "new", code: "aerate", name: "Aerating", taxable: "", season: "growing" });
-    const result = fromForm(form);
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.errors[0]!.fieldId).toBe(fieldId.service("new", "taxable"));
+  it("writes the same categories for every region group, with no minimum charge and only the mowing service", () => {
+    const legacy = {
+      ...content,
+      minChargeCents: 4500,
+      services: [...content.services, { code: "leaf_raking", name: "Leaf raking", taxable: false, season: "growing" as const }],
+    };
+    const result = fromForm(toForm(content), legacy, ["outer", "core"]);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.content.minChargeCents).toBe(0);
+    expect(result.content.services.map((s) => s.code)).toEqual(["mow"]);
+    expect(result.content.tiers).toEqual([
+      flat(0, 2500, 4500, "core"),
+      flat(2500, 5000, 5000, "core"),
+      flat(5000, OPEN_END_SQFT, 6000, "core"),
+      flat(0, 2500, 4500, "outer"),
+      flat(2500, 5000, 5000, "outer"),
+      flat(5000, OPEN_END_SQFT, 6000, "outer"),
+    ]);
   });
 
-  it("rejects overlapping tiers and a tier for a missing service", () => {
+  it("brings a per-square-foot tier through with no price, to be filled in", () => {
+    const form = toForm({ ...content, tiers: [flat(0, 5000, 4500), { ...flat(5000, 10000, 0), flatPriceCents: null, pricePerSqftMicrocents: 750_000 }] });
+    expect(form.categories.map((c) => c.price)).toEqual(["45.00", ""]);
+    const result = fromForm(form, content, ["standard"]);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors.map((e) => e.fieldId)).toEqual([fieldId.category(form.categories[1]!.key, "price")]);
+  });
+
+  it("names each problem by its field: a missing price, a bound not above the one before", () => {
     const form = toForm(content);
-    form.tiers[1]!.minSqft = "4000";
-    const overlap = fromForm(form);
-    expect(overlap.ok).toBe(false);
-    if (!overlap.ok) expect(overlap.errors[0]!.message).toMatch(/overlaps tier 1/);
-
-    const orphan = toForm(content);
-    orphan.services.shift();
-    const result = fromForm(orphan);
+    form.categories[0]!.price = "";
+    form.categories[1]!.upTo = "2000";
+    const result = fromForm(form, content, ["standard"]);
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.errors).toHaveLength(2);
+    if (result.ok) return;
+    expect(result.errors.map((e) => [e.fieldId, e.message])).toEqual([
+      [fieldId.category(form.categories[0]!.key, "price"), "Enter a dollar amount, such as 45.00"],
+      [fieldId.category(form.categories[1]!.key, "max"), "Must be more than 2,500, where the category above ends"],
+    ]);
+    expect(fromForm({ categories: [] }, content, ["standard"]).ok).toBe(false);
   });
 
-  it("compares forms without their row keys", () => {
+  it("labels ranges as the homeowner reads them", () => {
+    expect(rangeLabel(0, 2500)).toBe("0–2,500 sq ft");
+    expect(rangeLabel(2500, 5000)).toBe("2,501–5,000 sq ft");
+    expect(rangeLabel(15000, OPEN_END_SQFT)).toBe("15,001+ sq ft");
+  });
+
+  it("compares forms by what they would save, ignoring the open-ended bound", () => {
     expect(sameForm(toForm(content), toForm(content))).toBe(true);
     const changed = toForm(content);
-    changed.tiers[0]!.price = "46.00";
+    changed.categories[0]!.price = "46";
     expect(sameForm(toForm(content), changed)).toBe(false);
+    const last = toForm(content);
+    last.categories[2]!.upTo = "123";
+    expect(sameForm(toForm(content), last)).toBe(true);
   });
 });
 

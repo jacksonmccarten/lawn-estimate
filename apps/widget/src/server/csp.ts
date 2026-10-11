@@ -1,6 +1,7 @@
 // The widget page's Content-Security-Policy (docs/ENGINEERING_DESIGN.md
-// sections 4 and 10). frame-ancestors is the company's allowlist; an empty
-// list leaves 'self', so the hosted page works and an embed does not.
+// sections 4 and 10). frame-ancestors is the company's allowlist when it has
+// one; an empty list lets any site embed the widget (the default), and an
+// unknown company leaves 'self' only.
 
 import { Origin } from "@lq/api-contract";
 
@@ -9,8 +10,8 @@ const TURNSTILE = "https://challenges.cloudflare.com";
 const MAPBOX = "https://api.mapbox.com";
 
 export type CspInput = {
-  /** companies.allowed_origins. Anything that is not a bare origin is dropped. */
-  allowedOrigins: string[];
+  /** companies.allowed_origins: empty for any site. Null when no company has the slug. Anything that is not a bare origin is dropped. */
+  allowedOrigins: string[] | null;
   /** The API origin when it differs from this app's. */
   apiOrigin: string | null;
   /** The origin logos are served from. */
@@ -22,7 +23,10 @@ export type CspInput = {
   dev: boolean;
 };
 
-export function frameAncestors(allowedOrigins: string[]): string {
+export function frameAncestors(allowedOrigins: string[] | null): string {
+  if (allowedOrigins === null) return "frame-ancestors 'self'";
+  // No list: any site may embed the widget. Turnstile and the quota still guard the API.
+  if (allowedOrigins.length === 0) return "frame-ancestors *";
   const origins = new Set<string>();
   for (const origin of allowedOrigins) {
     if (Origin.safeParse(origin).success) origins.add(origin.toLowerCase());
