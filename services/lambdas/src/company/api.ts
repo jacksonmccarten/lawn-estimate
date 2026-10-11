@@ -11,6 +11,7 @@ import {
   PreviewQuoteRequest,
   PublishPricingVersionRequest,
   Regions,
+  ServiceRadius,
   ReplacePricingVersionRequest,
   routes,
   UpdateCompanyRequest,
@@ -101,6 +102,13 @@ export function createCompanyApi(deps: CompanyApiDeps) {
         case "PUT /regions": {
           const regions = body(Regions);
           return ok(routes.replaceRegions.response, await run((tx, companyId) => company.replaceRegions(tx, companyId, regions)));
+        }
+
+        case "GET /service-area":
+          return ok(routes.getServiceArea.response, await run((tx) => company.getServiceArea(tx)));
+        case "PUT /service-area": {
+          const radius = body(ServiceRadius);
+          return ok(routes.replaceServiceArea.response, await run((tx, companyId) => company.replaceServiceArea(tx, companyId, radius)));
         }
 
         case "GET /zips-near": {

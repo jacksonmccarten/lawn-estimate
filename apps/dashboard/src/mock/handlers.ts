@@ -13,7 +13,9 @@ import {
   ListLeadsQuery,
   PreviewQuoteRequest,
   PublishPricingVersionRequest,
+  RADIUS_REGION_GROUP,
   Regions,
+  ServiceRadius,
   ReplacePricingVersionRequest,
   UpdateCompanyRequest,
   ZipsNearQuery,
@@ -100,20 +102,22 @@ const handlers: Record<Exclude<keyof typeof routes, "estimate" | "submit" | "get
     return { schema: routes.replaceRegions.response, value: { regions: store.regions } };
   },
 
-  // Great-circle miles between centre points, as the real route measures.
+  getServiceArea: ({ store }) => ({
+    schema: routes.getServiceArea.response,
+    value: { radius: store.serviceRadius, zipCount: store.regions.filter((r) => r.kind === "zip").length },
+  }),
+
+  replaceServiceArea: ({ store, body }) => {
+    const radius = parse(ServiceRadius, body);
+    const zips = zipsWithin(radius.zip, radius.miles);
+    store.regions = zips.map((value) => ({ kind: "zip", value, tierGroup: RADIUS_REGION_GROUP }));
+    store.serviceRadius = radius;
+    return { schema: routes.replaceServiceArea.response, value: { radius, zipCount: zips.length } };
+  },
+
   getZipsNear: ({ query }) => {
     const { zip, miles } = parse(ZipsNearQuery, Object.fromEntries(query));
-    const centre = ZIP_CENTRES[zip];
-    if (!centre) throw new HttpError(400, "invalid_request", "that zip code is not one we have a location for", { zip: "unknown zip" });
-    const rad = (deg: number) => (deg * Math.PI) / 180;
-    const distance = ([lat, lng]: readonly [number, number]) =>
-      2 * 3958.8 * Math.asin(Math.sqrt(Math.sin(rad(lat - centre[0]) / 2) ** 2 + Math.cos(rad(centre[0])) * Math.cos(rad(lat)) * Math.sin(rad(lng - centre[1]) / 2) ** 2));
-    const zips = Object.entries(ZIP_CENTRES)
-      .map(([z, at]) => [z, distance(at)] as const)
-      .filter(([, d]) => d <= miles)
-      .sort((a, b) => a[1] - b[1] || a[0].localeCompare(b[0]))
-      .map(([z]) => z);
-    return { schema: routes.getZipsNear.response, value: { zip, miles, zips } };
+    return { schema: routes.getZipsNear.response, value: { zip, miles, zips: zipsWithin(zip, miles) } };
   },
 
   listPricingVersions: ({ store }) => ({
@@ -256,4 +260,18 @@ export function handleMockRequest(request: { method: string; path: string; query
     console.error("mock company-api failed", error instanceof Error ? error.name : "unknown");
     return { status: 500, body: errorBody("internal", "internal error") };
   }
+}
+
+/** Great-circle miles between centre points, as the real route measures; nearest first. */
+function zipsWithin(zip: string, miles: number): string[] {
+  const centre = ZIP_CENTRES[zip];
+  if (!centre) throw new HttpError(400, "invalid_request", "that zip code is not one we have a location for", { zip: "unknown zip" });
+  const rad = (deg: number) => (deg * Math.PI) / 180;
+  const distance = ([lat, lng]: readonly [number, number]) =>
+    2 * 3958.8 * Math.asin(Math.sqrt(Math.sin(rad(lat - centre[0]) / 2) ** 2 + Math.cos(rad(centre[0])) * Math.cos(rad(lat)) * Math.sin(rad(lng - centre[1]) / 2) ** 2));
+  return Object.entries(ZIP_CENTRES)
+    .map(([z, at]) => [z, distance(at)] as const)
+    .filter(([, d]) => d <= miles)
+    .sort((a, b) => a[1] - b[1] || a[0].localeCompare(b[0]))
+    .map(([z]) => z);
 }
