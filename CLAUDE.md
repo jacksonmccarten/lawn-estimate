@@ -18,7 +18,7 @@ Source of truth for design decisions: `docs/ENGINEERING_DESIGN.md`. Legal, tax a
 - **Public routes run as `app_public`, with its own credentials.** That role has no table grants; it can read `public_company_profile` and call only the SECURITY DEFINER functions granted to it.
 - **`company_id` comes from `company_members` by Cognito `sub`, server-side.** Never from a user-writable Cognito attribute.
 - **Anyone may sign up, and a new company is on a trial.** A login must verify its email before it can create a company; the company starts with an allowance of 50 estimates a month (`companies.regrid_lookup_quota`, which now counts estimates priced) and no pricing, so nothing is quoted until its owner publishes a version.
-- **Public routes (`/estimate`, `/submit`) always check Turnstile, origin allowlist and company quota before pricing.**
+- **Public routes (`/estimate`, `/submit`) always check Turnstile, origin allowlist and company quota before pricing.** An empty allowlist (the default) means any site may embed the widget; a company that lists sites is held to them.
 - **Secrets live only in Secrets Manager and Lambda env.** Nothing secret in the widget bundle or the dashboard. The Mapbox token the widget sends to browsers is a public token (`pk.`), restricted to our origins in the Mapbox account; the widget refuses to start with any other kind.
 - **Widget and dashboard are separate origins** (`w.` and `app.`). Company theming is validated (hex color regex, logo from our S3 only, name escaped). No inline script in the widget CSP.
 - **The homeowner quote is an estimate.** The CTA is "request service"; nothing on the quote screen reads as a contract. (R6)

@@ -19,7 +19,7 @@ export const getServerSideProps: GetServerSideProps<WidgetProps> = async ({ para
   res.setHeader(
     "Content-Security-Policy",
     buildCsp({
-      allowedOrigins: profile?.allowedOrigins ?? [],
+      allowedOrigins: profile ? profile.allowedOrigins : null,
       apiOrigin: config.apiOrigin,
       logoOrigin: config.logoBaseUrl,
       turnstile: config.turnstileSiteKey !== null,

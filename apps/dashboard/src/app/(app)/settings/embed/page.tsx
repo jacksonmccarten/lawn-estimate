@@ -204,14 +204,19 @@ function Settings({ company, onSaved }: { company: Company; onSaved: (company: C
       </section>
 
       <section className="card" aria-labelledby="origins-heading">
-          <h2 id="origins-heading">Sites allowed to show the widget</h2>
+        <h2 id="origins-heading">Where the widget works</h2>
+        <p>
+          {origins.length === 0
+            ? "Your widget works on any website: Squarespace, Wix, WordPress or your own. There’s nothing to set up."
+            : `Your widget only works on ${origins.length === 1 ? "this site" : `these ${origins.length} sites`}. Remove them all to let it work on any website.`}
+        </p>
+        <details className="origin-limit" open={origins.length > 0}>
+          <summary>Limit the widget to your own sites (optional)</summary>
           <p className="muted">
-            The widget only loads inside pages on these sites, and only they can request quotes with it. With none listed, the hosted page still works and
-            embedding does not. List each address your site uses, for example with and without <code>www</code>.
+            Most businesses don&rsquo;t need this. When you list sites, the widget only loads inside pages on them and only they can request quotes
+            with it; the hosted page always works. List each address your site uses, for example with and without <code>www</code>.
           </p>
-          {origins.length === 0 ? (
-            <p>No sites yet.</p>
-          ) : (
+          {origins.length > 0 && (
             <ul className="origin-list">
               {origins.map((origin) => (
                 <li key={origin}>
@@ -261,7 +266,8 @@ function Settings({ company, onSaved }: { company: Company; onSaved: (company: C
           <p role="status" className="muted">
             {originStatus}
           </p>
-        </section>
+        </details>
+      </section>
 
       <form onSubmit={save} noValidate className="stack">
         <ErrorSummary errors={errors} summaryRef={summaryRef} />
