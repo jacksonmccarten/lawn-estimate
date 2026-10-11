@@ -2,7 +2,7 @@
 // for services/lambdas + packages/db until step 4; it is never served by a
 // deployed build (see next.config.ts and the route handler).
 
-import type { Company, Lead, PricingVersion, PricingVersionContent, Question, ServiceRegion, Usage } from "@lq/api-contract";
+import type { Company, Lead, PricingVersion, PricingVersionContent, Question, ServiceRadius, ServiceRegion, Usage } from "@lq/api-contract";
 import { priceQuote } from "@lq/pricing";
 import { PA_COUNTIES } from "@/lib/pa-counties";
 
@@ -12,6 +12,7 @@ export type Store = {
   members: Map<string, string>;
   regions: ServiceRegion[];
   questions: Question[];
+  serviceRadius: ServiceRadius | null;
   versions: PricingVersion[];
   leads: Lead[];
   usage: Usage;
@@ -155,6 +156,7 @@ function seed(): Store {
       { kind: "zip", value: "15217", tierGroup: "core" },
     ],
     questions: EXAMPLE_QUESTIONS.map((q) => ({ ...q, options: [...q.options] })),
+    serviceRadius: null,
     versions,
     leads: seedLeads(versions),
     usage: { month: "2026-10-01", regridLookups: 212, quotes: 187, regridLookupQuota: 1000 },

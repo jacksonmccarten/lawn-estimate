@@ -517,6 +517,51 @@ describe("/questionnaire", () => {
   });
 });
 
+describe("/service-area", () => {
+  const home = { street: "123 College Ave", city: "State College", state: "pa", zip: "16801", miles: 5 };
+
+  it("is unset until the owner gives an address and radius", async () => {
+    const { status, body } = await call(bravo, "GET /service-area");
+    expect(status).toBe(200);
+    expect(body.radius).toBeNull();
+  });
+
+  it("stores the address and radius, and makes the zips within it the only regions", async () => {
+    const { status, body } = await call(bravo, "PUT /service-area", { body: home });
+    expect(status).toBe(200);
+    expect(body.radius).toEqual({ ...home, state: "PA" });
+    const within = (await call(bravo, "GET /zips-near", { query: { zip: "16801", miles: "5" } })).body.zips as string[];
+    expect(body.zipCount).toBe(within.length);
+    const regions = (await call(bravo, "GET /regions")).body.regions as { kind: string; value: string; tierGroup: string }[];
+    expect(regions.map((r) => r.value).sort()).toEqual([...within].sort());
+    expect(new Set(regions.map((r) => `${r.kind}:${r.tierGroup}`))).toEqual(new Set(["zip:standard"]));
+    expect((await call(bravo, "GET /service-area")).body).toEqual(body);
+
+    // A wider radius replaces the area; alpha's is untouched.
+    const wider = await call(bravo, "PUT /service-area", { body: { ...home, miles: 25.04 } });
+    expect(wider.body.radius.miles).toBe(25);
+    expect(wider.body.zipCount).toBeGreaterThan(body.zipCount);
+    expect((await call(alpha, "GET /service-area")).body.radius).toBeNull();
+    expect((await call(alpha, "GET /regions")).body.regions).toHaveLength(3);
+  });
+
+  it("refuses an unknown zip, a radius out of range or a short address, and changes nothing", async () => {
+    const before = (await call(bravo, "GET /service-area")).body;
+    for (const bad of [
+      { ...home, zip: "00000" },
+      { ...home, miles: 0 },
+      { ...home, miles: 101 },
+      { ...home, street: "x" },
+      { ...home, state: "Penn" },
+    ]) {
+      const res = await call(bravo, "PUT /service-area", { body: bad });
+      expect([res.status, res.body.error.code], JSON.stringify(bad)).toEqual([400, "invalid_request"]);
+    }
+    expect((await call(bravo, "GET /service-area")).body).toEqual(before);
+    expect((await call(null, "GET /service-area")).status).toBe(401);
+  });
+});
+
 describe("POST /billing/session", () => {
   it("answers 503 when AWS Monetization is not configured", async () => {
     const res = await call(alpha, "POST /billing/session", { body: { page: "plans" } });

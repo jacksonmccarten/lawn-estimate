@@ -103,6 +103,34 @@ export const Questionnaire = z
   .strictObject({ questions: z.array(Question).max(20) })
   .refine((q) => new Set(q.questions.map((x) => x.id)).size === q.questions.length, { message: "question ids must differ", path: ["questions"] });
 export type Questionnaire = z.infer<typeof Questionnaire>;
+// ---- GET /service-area, PUT /service-area
+
+/**
+ * The service area as the dashboard asks for it: the business address and a
+ * radius around it. PUT stores both and replaces the company's regions with
+ * the zips whose centre points are within the radius of the address's zip,
+ * all in the `standard` region group. The tax county still comes from each
+ * homeowner's zip.
+ */
+export const ServiceRadius = z.strictObject({
+  street: z.string().trim().min(3).max(200),
+  city: z.string().trim().min(2).max(100),
+  state: z
+    .string()
+    .trim()
+    .regex(/^[A-Za-z]{2}$/)
+    .transform((s) => s.toUpperCase()),
+  zip: Zip,
+  miles: z.number().min(1).max(100),
+});
+export type ServiceRadius = z.infer<typeof ServiceRadius>;
+
+/** `radius` is null until the owner sets one; `zipCount` is how many zips the area now covers. */
+export const ServiceAreaSettings = z.strictObject({ radius: ServiceRadius.nullable(), zipCount: z.int().nonnegative() });
+export type ServiceAreaSettings = z.infer<typeof ServiceAreaSettings>;
+
+/** The region group every zip of a radius service area is in, and the one flat-rate tiers name. */
+export const RADIUS_REGION_GROUP = "standard";
 
 // ---- pricing versions
 
