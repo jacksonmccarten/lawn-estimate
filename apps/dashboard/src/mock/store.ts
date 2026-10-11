@@ -2,7 +2,7 @@
 // for services/lambdas + packages/db until step 4; it is never served by a
 // deployed build (see next.config.ts and the route handler).
 
-import type { Company, Lead, PricingVersion, PricingVersionContent, ServiceRegion, Usage } from "@lq/api-contract";
+import type { Company, Lead, PricingVersion, PricingVersionContent, ServiceRadius, ServiceRegion, Usage } from "@lq/api-contract";
 import { priceQuote } from "@lq/pricing";
 import { PA_COUNTIES } from "@/lib/pa-counties";
 
@@ -11,6 +11,7 @@ export type Store = {
   /** company_members: Cognito sub → company. The only way a request finds its company. */
   members: Map<string, string>;
   regions: ServiceRegion[];
+  serviceRadius: ServiceRadius | null;
   versions: PricingVersion[];
   leads: Lead[];
   usage: Usage;
@@ -144,6 +145,7 @@ function seed(): Store {
       { kind: "zip", value: "16823", tierGroup: "outer" },
       { kind: "zip", value: "15217", tierGroup: "core" },
     ],
+    serviceRadius: null,
     versions,
     leads: seedLeads(versions),
     usage: { month: "2026-10-01", regridLookups: 212, quotes: 187, regridLookupQuota: 1000 },

@@ -871,31 +871,12 @@ a.link {
   overflow-wrap: anywhere;
 }
 
-/* Service areas: the list, the remove control and the centre address of a new one. */
-.area-list {
-  list-style: none;
-  margin: 0 0 1rem;
-  padding: 0;
-}
-.area-list li {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  padding: 0.5rem 0;
-  border-bottom: 1px solid var(--border);
+/* Service area: the business address and radius. */
+.current-area {
+  margin: 0.5rem 0 1rem;
 }
 
 .area-form {
-  margin-top: 1rem;
-}
-
-.zip-list {
-  overflow-wrap: anywhere;
-}
-
-.area-remove {
   margin-top: 1rem;
 }
 
