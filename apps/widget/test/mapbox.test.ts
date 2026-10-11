@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { geocode, pan, project, ringSqft, staticImageUrl, totalSqft, unproject, zoomBy, MAX_ZOOM, MIN_ZOOM, type LngLat, type View } from "../src/lib/mapbox";
+import { geocode, lawnSqft, pan, project, ringSqft, staticImageUrl, totalSqft, unproject, zoomBy, MAX_ZOOM, MIN_ZOOM, type LngLat, type View } from "../src/lib/mapbox";
 
 // State College, PA.
 const HOME: LngLat = { lng: -77.8600, lat: 40.7934 };
@@ -68,6 +68,59 @@ describe("outlined area", () => {
     const total = totalSqft([square(30), square(10, 50)]);
     expect(Number.isInteger(total)).toBe(true);
     expect(Math.abs(total - 1000 * 10.7639104)).toBeLessThan(25);
+  });
+});
+
+describe("lawn area from include and exclude outlines", () => {
+  const box = (west: number, south: number, east: number, north: number): LngLat[] => [
+    offset(west, south),
+    offset(east, south),
+    offset(east, north),
+    offset(west, north),
+  ];
+  const SQFT = 10.7639104;
+  const near = (got: number, sqm: number) => expect(Math.abs(got - sqm * SQFT)).toBeLessThan(sqm * SQFT * 0.002 + 1);
+
+  it("is nothing without an include outline", () => {
+    expect(lawnSqft([])).toBe(0);
+    expect(lawnSqft([{ kind: "exclude", ring: box(0, 0, 10, 10) }])).toBe(0);
+    expect(lawnSqft([{ kind: "include", ring: box(0, 0, 10, 10).slice(0, 2) }])).toBe(0);
+  });
+
+  it("measures one include outline like ringSqft", () => {
+    near(lawnSqft([{ kind: "include", ring: box(0, 0, 30, 30) }]), 900);
+  });
+
+  it("counts overlapping include outlines once", () => {
+    // Two 20 x 20 squares overlapping by 10 x 20: 600 m², not 800.
+    near(lawnSqft([{ kind: "include", ring: box(0, 0, 20, 20) }, { kind: "include", ring: box(10, 0, 30, 20) }]), 600);
+  });
+
+  it("takes away an exclude outline inside the lawn", () => {
+    near(lawnSqft([{ kind: "include", ring: box(0, 0, 30, 30) }, { kind: "exclude", ring: box(10, 10, 20, 20) }]), 800);
+  });
+
+  it("takes away only the part of an exclude outline that overlaps grass", () => {
+    // Half of the 10 x 10 exclusion hangs outside the lawn.
+    near(lawnSqft([{ kind: "include", ring: box(0, 0, 30, 30) }, { kind: "exclude", ring: box(25, 10, 35, 20) }]), 850);
+    // Entirely outside: nothing is taken.
+    near(lawnSqft([{ kind: "include", ring: box(0, 0, 30, 30) }, { kind: "exclude", ring: box(50, 50, 60, 60) }]), 900);
+  });
+
+  it("does not take away overlapping exclude outlines twice", () => {
+    near(
+      lawnSqft([
+        { kind: "include", ring: box(0, 0, 30, 30) },
+        { kind: "exclude", ring: box(0, 0, 10, 10) },
+        { kind: "exclude", ring: box(5, 0, 15, 10) },
+      ]),
+      750,
+    );
+  });
+
+  it("is all gone when an exclude outline covers the lawn, and rounds to a whole square foot", () => {
+    expect(lawnSqft([{ kind: "include", ring: box(5, 5, 10, 10) }, { kind: "exclude", ring: box(0, 0, 20, 20) }])).toBe(0);
+    expect(Number.isInteger(lawnSqft([{ kind: "include", ring: box(0, 0, 13.3, 7.1) }]))).toBe(true);
   });
 });
 

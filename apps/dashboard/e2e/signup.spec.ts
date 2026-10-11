@@ -98,7 +98,7 @@ test("a visitor who is not signed in cannot reach company setup", async ({ page 
   await expect(page).toHaveURL(/\/sign-in\?next=%2Fonboarding/);
 });
 
-test("a new company's first draft has a service to price and its region group already chosen", async ({ page }) => {
+test("a new company's first draft starts from example flat-rate categories", async ({ page }) => {
   await page.goto("/sign-up");
   await page.getByLabel("Email").fill("first.draft@example.com");
   await page.getByLabel("Password").fill(PASSWORD);
@@ -120,17 +120,14 @@ test("a new company's first draft has a service to price and its region group al
     return (await res.json()) as { id: string };
   });
   await page.goto(`/pricing/${created.id}`);
-  await expect(page.getByRole("heading", { level: 2, name: "Tiers", exact: true })).toBeVisible();
-  // What a region group is, and which ones this company has.
-  await expect(page.getByText(/A region group is a part of your service area that shares one set of prices/)).toBeVisible();
-  await expect(page.getByText("Yours are: core, outer.")).toBeVisible();
-
-  // Mowing is there from the start, so the first tier has a service, and its region group is a choice, not a blank.
-  await page.getByRole("button", { name: "Add tier" }).click();
-  await expect(page.getByRole("button", { name: /Tier 1, service/ })).toContainText("Mowing, trimming and edging");
-  await expect(page.getByRole("button", { name: /Tier 1, region group/ })).toContainText("core");
-  await page.getByRole("button", { name: /Tier 1, region group/ }).click();
-  await expect(page.getByRole("option")).toHaveText(["core", "outer"]);
-  await page.keyboard.press("Escape");
+  await expect(page.getByRole("heading", { level: 2, name: "Lawn mowing prices" })).toBeVisible();
+  const rows = page.locator('[aria-label="Lawn size categories table"] tbody tr');
+  await expect(rows.locator("th")).toHaveText(["0–2,500 sq ft", "2,501–5,000 sq ft", "5,001–10,000 sq ft", "10,001–15,000 sq ft", "15,001+ sq ft"]);
+  await expect(page.getByLabel("Category 5, flat rate in dollars")).toHaveValue("90.00");
+  // Examples are not saved until the owner saves them.
+  await expect(page.getByText("You have unsaved changes.")).toBeVisible();
+  await page.getByRole("button", { name: "Save draft" }).click();
+  await expect(page.getByRole("status").filter({ hasText: /Draft saved at/ })).toBeVisible();
+  await expect(page.getByText("You have unsaved changes.")).toHaveCount(0);
   await expectAccessible(page);
 });

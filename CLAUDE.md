@@ -9,7 +9,7 @@ Source of truth for design decisions: `docs/ENGINEERING_DESIGN.md`. Legal, tax a
 - **Pricing is rules only.** Price = the company's published pricing version applied to an estimated grass area. No models, no learned parameters, no cross-tenant data, ever. (R20)
 - **Pricing runs server-side in a pure package** (`packages/pricing`). The browser never receives a rate or a tier. The dashboard's "preview a quote" calls the same package.
 - **Every service has a `taxable` flag; every quote stores line items; tax applies only to the taxable subtotal** at the county rate. Taxable and non-taxable lines are never merged. (R1–R4)
-- **The lawn area is the homeowner's outline.** The widget finds the address with Mapbox, shows a satellite photo, and measures the outline in the browser; `/estimate` receives square feet (`manual.size.kind = "drawn"`). The lot-size form is always offered beside it, and is the path when the address is not found. No Regrid: the parcel lookup is retired on cost and no Regrid token is configured anywhere.
+- **The lawn area is the homeowner's outline.** The widget finds the address with Mapbox, shows a satellite photo, and measures the outline in the browser; `/estimate` receives square feet (`manual.size.kind = "drawn"`). The homeowner draws positive areas (grass) and negative areas (left out); the lawn is their union less the overlapping negatives. The lot-size form is the fallback only, when the address is not found or the photo cannot load. No Regrid: the parcel lookup is retired on cost and no Regrid token is configured anywhere.
 - **Nothing from Mapbox is stored or sent to our API.** Only the address's position is read, to aim the photo; the zip on a quote is the one the homeowner typed. (R16)
 - **The tax county is the primary county of the zip** (`county_for_zip`); when a zip's counties are taxed differently the homeowner is asked which. Every estimate carries a zip. The quote shows the county. (R4)
 - **An unknown county at pricing time routes to the manual path with an alert.** If the zip gives no county either, the homeowner is asked to call. Never a default tax rate. (R4)
@@ -47,7 +47,7 @@ Source of truth for design decisions: `docs/ENGINEERING_DESIGN.md`. Legal, tax a
 - Never log PII (addresses, phones, emails). Log quote ids.
 - Mapbox calls come from the homeowner's browser and are not metered by us: watch usage in the Mapbox account. The Regrid meters (`usage_meters.regrid_lookups`, the 8,000/month cap) are dormant.
 - Pennsylvania seeds: services with taxable flags per 61 Pa. Code § 55.6; county tax rates 6% (7% Allegheny, 8% Philadelphia).
-- A service area is county regions plus zip regions, each with a region group; a zip region wins over a county region. A "service area" in the dashboard is a region group; one made there is only a set of zip regions sharing a group, made from zip-code centre points (`zip_centroid`), never from a geocoded address.
+- A service area is county regions plus zip regions, each with a region group; a zip region wins over a county region. The dashboard sets it as a business address and a radius (`PUT /service-area`): the zips whose centre points (`zip_centroid`) are within the radius of the address's zip, all in group `standard`. The address is typed, never geocoded.
 
 ## Build order
 

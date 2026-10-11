@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button, Link } from "react-aria-components";
 import { useApi } from "@/components/auth-provider";
+import { QuestionnaireEditor } from "@/components/questionnaire-editor";
 import { BusyButton, ConfirmDialog, LoadError, Loading, PageHeading, StatusChip, TableScroll } from "@/components/ui";
 import { describeError } from "@/lib/api";
 import { formatDate, formatDateTime } from "@/lib/format";
@@ -120,6 +121,7 @@ export default function PricingPage() {
           )}
         </>
       )}
+      <QuestionnaireEditor />
       <ConfirmDialog
         isOpen={rollback !== null}
         onClose={() => {
