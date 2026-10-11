@@ -1,13 +1,13 @@
-// The homepage: what InstaQuoter AI is, how it works, and the way to sign up.
+// The homepage: what InstaQuotesAI is, how it works, and the way to sign up.
 
 import Link from "next/link";
 
 const STEPS = [
-  { title: "Add InstaQuoter to Your Website", body: "Embed the quoting widget directly into your existing website." },
+  { title: "Add InstaQuotesAI to Your Website", body: "Embed the quoting widget directly into your existing website." },
   { title: "Customers Measure Their Lawn", body: "Homeowners enter their address and outline their lawn using an interactive satellite map." },
   {
     title: "Generate Instant Pricing",
-    body: "InstaQuoter calculates the lawn area and provides a price based on the business's configured pricing categories.",
+    body: "InstaQuotesAI calculates the lawn area and provides a price based on the business's configured pricing categories.",
   },
   { title: "Convert Leads Into Customers", body: "Customers can proceed toward booking through the integrated quoting workflow." },
 ];
@@ -83,7 +83,7 @@ export default function HomePage() {
           <div className="hero-copy reveal">
             <h1 id="hero-heading">Instant Lawn Care Quotes. More Customers. Less Work.</h1>
             <p className="hero-lead">
-              InstaQuoter AI helps lawn care businesses automate their estimating process. Customers can measure their lawns, receive instant pricing, and
+              InstaQuotesAI helps lawn care businesses automate their estimating process. Customers can measure their lawns, receive instant pricing, and
               move toward booking services directly from your website — saving you time and helping you convert more leads.
             </p>
             <div className="hero-actions">
@@ -124,7 +124,7 @@ export default function HomePage() {
 
       <section className="site-section site-section-alt" aria-labelledby="benefits-heading">
         <div className="site-container">
-          <p className="eyebrow">Why InstaQuoter AI</p>
+          <p className="eyebrow">Why InstaQuotesAI</p>
           <h2 id="benefits-heading">Built for lawn care businesses</h2>
           <ul className="benefits">
             {BENEFITS.map((benefit) => (

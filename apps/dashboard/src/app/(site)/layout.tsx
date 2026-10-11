@@ -7,7 +7,7 @@ import type { ReactNode } from "react";
 import "./site.css";
 
 export const metadata: Metadata = {
-  title: { default: "InstaQuoter AI: instant lawn care quotes", template: "%s · InstaQuoter AI" },
+  title: { default: "InstaQuotesAI: instant lawn care quotes", template: "%s · InstaQuotesAI" },
   description: "Instant lawn mowing quotes from your own website. Homeowners outline their lawn on a satellite photo and get your flat-rate price on the spot.",
   // The marketing pages are meant to be found; the dashboard is not (root layout).
   robots: { index: true, follow: true },
@@ -27,7 +27,7 @@ export default function SiteLayout({ children }: { children: ReactNode }) {
       </a>
       <header className="site-header">
         <div className="site-container site-header-row">
-          <Link href="/" className="site-brand" aria-label="InstaQuoter AI home">
+          <Link href="/" className="site-brand" aria-label="InstaQuotesAI home">
             <span className="site-mark" aria-hidden="true">
               <svg viewBox="0 0 32 32" width="28" height="28" focusable="false">
                 <rect width="32" height="32" rx="8" fill="currentColor" />
@@ -39,7 +39,7 @@ export default function SiteLayout({ children }: { children: ReactNode }) {
               </svg>
             </span>
             <span className="site-wordmark">
-              InstaQuoter <span className="site-wordmark-ai">AI</span>
+              InstaQuotes<span className="site-wordmark-ai">AI</span>
             </span>
           </Link>
           <nav aria-label="Main" className="site-nav">
@@ -69,7 +69,7 @@ export default function SiteLayout({ children }: { children: ReactNode }) {
       <footer className="site-footer">
         <div className="site-container site-footer-row">
           <p>
-            <strong>InstaQuoter AI</strong>
+            <strong>InstaQuotesAI</strong>
             <br />
             Instant lawn care quotes for lawn care businesses.
           </p>
@@ -86,7 +86,7 @@ export default function SiteLayout({ children }: { children: ReactNode }) {
               </li>
             </ul>
           </nav>
-          <p className="site-footer-small">© {new Date().getFullYear()} InstaQuoter AI</p>
+          <p className="site-footer-small">© {new Date().getFullYear()} InstaQuotesAI</p>
         </div>
       </footer>
     </div>

@@ -5,7 +5,7 @@ export const metadata: Metadata = { title: "About us" };
 
 const VALUES = [
   { title: "Penn State engineering", body: "We’re engineering students at Penn State, used to taking a real problem apart and building something that solves it." },
-  { title: "Entrepreneurship and technology", body: "We started InstaQuoter AI because we love building products that people actually use." },
+  { title: "Entrepreneurship and technology", body: "We started InstaQuotesAI because we love building products that people actually use." },
   { title: "Efficiency for home services", body: "Our mission is to help home service businesses spend less time on paperwork and more time on the work." },
   { title: "Practical, affordable automation", body: "Simple, affordable tools a small business can set up quickly and rely on every day." },
 ];
@@ -27,7 +27,7 @@ export default function AboutPage() {
             We believe small businesses deserve access to powerful, easy-to-use technology that saves time, simplifies operations, and helps them grow.
           </p>
           <p>
-            InstaQuoter AI was created to make lawn care estimating faster, easier, and more convenient for both businesses and their customers.
+            InstaQuotesAI was created to make lawn care estimating faster, easier, and more convenient for both businesses and their customers.
           </p>
         </div>
       </section>

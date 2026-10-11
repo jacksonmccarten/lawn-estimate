@@ -8,12 +8,12 @@ test.beforeEach(async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
 });
 
-test("the homepage introduces InstaQuoter AI and leads to sign-up and log-in", async ({ page }) => {
+test("the homepage introduces InstaQuotesAI and leads to sign-up and log-in", async ({ page }) => {
   await page.goto("/");
   await expect(page).toHaveURL(/\/$/);
-  await expect(page).toHaveTitle("InstaQuoter AI: instant lawn care quotes");
+  await expect(page).toHaveTitle("InstaQuotesAI: instant lawn care quotes");
   await expect(page.getByRole("heading", { level: 1, name: "Instant Lawn Care Quotes. More Customers. Less Work." })).toBeVisible();
-  await expect(page.getByText(/InstaQuoter AI helps lawn care businesses automate their estimating process/)).toBeVisible();
+  await expect(page.getByText(/InstaQuotesAI helps lawn care businesses automate their estimating process/)).toBeVisible();
 
   const main = page.getByRole("main");
   await expect(main.getByRole("link", { name: "Get Started" }).first()).toHaveAttribute("href", "/sign-up");
@@ -25,7 +25,7 @@ test("the homepage introduces InstaQuoter AI and leads to sign-up and log-in", a
   await main.getByRole("link", { name: "See How It Works" }).click();
   await expect(page).toHaveURL(/#how-it-works$/);
   const steps = page.getByRole("region", { name: /four steps/ }).getByRole("heading", { level: 3 });
-  await expect(steps).toHaveText(["Add InstaQuoter to Your Website", "Customers Measure Their Lawn", "Generate Instant Pricing", "Convert Leads Into Customers"]);
+  await expect(steps).toHaveText(["Add InstaQuotesAI to Your Website", "Customers Measure Their Lawn", "Generate Instant Pricing", "Convert Leads Into Customers"]);
   await expect(page.getByRole("region", { name: "Built for lawn care businesses" }).getByRole("listitem")).toHaveCount(7);
   await expectAccessible(page);
 });
@@ -35,12 +35,12 @@ test("About and Contact pages, with a phone number that calls", async ({ page })
   await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "About" }).click();
   await expect(page).toHaveURL(/\/about$/);
   await expect(page.getByText("We are a team of Penn State engineering students passionate about making home services more efficient.")).toBeVisible();
-  await expect(page.getByText(/InstaQuoter AI was created to make lawn care estimating faster/)).toBeVisible();
+  await expect(page.getByText(/InstaQuotesAI was created to make lawn care estimating faster/)).toBeVisible();
   await expectAccessible(page);
 
   await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Contact" }).click();
   await expect(page).toHaveURL(/\/contact$/);
-  await expect(page.getByRole("heading", { level: 2, name: "InstaQuoter AI" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "InstaQuotesAI" })).toBeVisible();
   await expect(page.getByRole("link", { name: "267-405-0260" })).toHaveAttribute("href", "tel:+12674050260");
   await expectAccessible(page);
 });

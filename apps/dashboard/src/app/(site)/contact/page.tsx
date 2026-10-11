@@ -8,14 +8,14 @@ export default function ContactPage() {
       <section className="page-hero" aria-labelledby="contact-heading">
         <div className="site-container narrow reveal">
           <p className="eyebrow">Contact</p>
-          <h1 id="contact-heading">Talk to the InstaQuoter AI team</h1>
+          <h1 id="contact-heading">Talk to the InstaQuotesAI team</h1>
           <p className="hero-lead">Questions about getting started, pricing or your website? We’re happy to help.</p>
         </div>
       </section>
       <section className="site-section" aria-labelledby="reach-heading">
         <div className="site-container narrow">
           <div className="contact-card">
-            <h2 id="reach-heading">InstaQuoter AI</h2>
+            <h2 id="reach-heading">InstaQuotesAI</h2>
             <dl className="contact-details">
               <dt>Phone</dt>
               <dd>
