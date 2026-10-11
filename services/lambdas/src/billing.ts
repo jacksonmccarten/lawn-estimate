@@ -3,9 +3,10 @@
 // public routes know the slug before they open a transaction, and the
 // dashboard reads it from the company row.
 //
-// The plans live in AWS Monetization: a free Trial of 50 estimates a month and
-// a $100 Standard plan with no practical limit. One meter, estimate_priced,
-// counts every new estimate a homeowner is priced.
+// The plans live in AWS Monetization: a free Trial of 5 estimates a month and
+// a Standard plan with no practical limit, paid by the month ($20) or for a
+// full year ($200). One meter, estimate_priced, counts every new estimate a
+// homeowner is priced.
 //
 // The database allowance (companies.regrid_lookup_quota) stays the rule for a
 // company with no subscription, and whenever AWS Monetization cannot be

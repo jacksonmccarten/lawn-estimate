@@ -49,13 +49,19 @@ Override any of them for one command with `-c name=value`.
 
 ## Billing (AWS Monetization, private beta)
 
-Companies buy their plan through AWS Monetization: a free Trial (50 estimates
-a month) and Standard ($100 a month, no practical limit). It hosts the plan,
+Companies buy their plan through AWS Monetization: a free Trial (5 estimates
+a month) and Standard (no practical limit), paid by the month ($20) or for a
+full year ($200). It hosts the plan,
 checkout and invoice pages; the dashboard's Billing page opens them. The
 `/estimate` function asks it before pricing and counts each new estimate
 (`services/lambdas/src/billing.ts`). A company with no subscription, or a
 moment when AWS Monetization does not answer, falls back to the database
 allowance (`companies.regrid_lookup_quota`).
+
+The plans are not in this repository. A change to a price, a billing period or
+the Trial's allowance is made in AWS Monetization and published there; the
+sign-up allowance in the database (migration `0018`) and the wording on the
+dashboard's Billing and onboarding pages are kept in step by hand.
 
 The SDK comes from a private npm registry (`.npmrc`). Installing needs its
 token, which is never committed:
