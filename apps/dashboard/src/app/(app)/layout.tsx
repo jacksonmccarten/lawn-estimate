@@ -47,7 +47,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   if (state.status !== "signed-in") {
     return (
       <main className="centered">
-        <title>Instant Lawn Quote</title>
+        <title>InstaQuotesAI</title>
         <p role="status" className="muted">
           Checking your session&hellip;
         </p>
@@ -63,7 +63,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       <header className="app-header">
         <div className="app-header-row">
           <p className="brand">
-            <span className="brand-name">Instant Lawn Quote</span>
+            <span className="brand-name">InstaQuotesAI</span>
             {companyName && <span className="brand-company">{companyName}</span>}
           </p>
           {/* Help and account sit in the same place on every screen (3.2.6). */}

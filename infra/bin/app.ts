@@ -11,5 +11,5 @@ const app = new App();
 const config = readConfig(app);
 const env = { account: process.env.CDK_DEFAULT_ACCOUNT, region: config.region };
 
-const state = new StateStack(app, "LqState", { env, config, description: "Instant Lawn Quote: logins, secrets and user pool" });
-new ApiStack(app, "LqApi", { env, config, state, description: "Instant Lawn Quote: HTTP API and Lambdas" });
+const state = new StateStack(app, "LqState", { env, config, description: "InstaQuotesAI: logins, secrets and user pool" });
+new ApiStack(app, "LqApi", { env, config, state, description: "InstaQuotesAI: HTTP API and Lambdas" });

@@ -142,7 +142,7 @@ export class ApiStack extends Stack {
     });
 
     const api = new HttpApi(this, "Api", {
-      description: "Instant Lawn Quote: public estimate and submit routes, and the company API",
+      description: "InstaQuotesAI: public estimate and submit routes, and the company API",
       corsPreflight: {
         allowOrigins: [...new Set([config.widgetOrigin, config.dashboardOrigin])],
         allowMethods: [CorsHttpMethod.GET, CorsHttpMethod.POST, CorsHttpMethod.PUT, CorsHttpMethod.PATCH, CorsHttpMethod.OPTIONS],
