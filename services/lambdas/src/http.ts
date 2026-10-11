@@ -25,6 +25,7 @@ const STATUS: Record<ErrorCode, number> = {
   version_published: 409,
   lead_already_decided: 409,
   billing_unavailable: 503,
+  contact_unavailable: 503,
   internal: 500,
 };
 
