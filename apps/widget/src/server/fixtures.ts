@@ -56,7 +56,7 @@ function named(name: string): EstimateResponse {
 export function replayEstimate(request: EstimateRequest, allowedOrigins: string[] | null): FixtureReply<EstimateResponse> {
   if (!("token" in request)) {
     if (!allowedOrigins) return recordedError("not_found");
-    if (request.embedOrigin !== null && !allowedOrigins.includes(request.embedOrigin.toLowerCase())) {
+    if (request.embedOrigin !== null && allowedOrigins.length > 0 && !allowedOrigins.includes(request.embedOrigin.toLowerCase())) {
       return recordedError("origin_not_allowed");
     }
   }

@@ -58,9 +58,10 @@ export function createBridge(allowedOrigins: string[]): Bridge {
       const onMessage = (event: MessageEvent) => {
         if (event.source !== window.parent) return;
         if ((event.data as { type?: unknown } | null)?.type !== "lq:hello") return;
-        // frame-ancestors already keeps other sites from framing the page;
-        // this keeps the page from talking to one if that header is lost.
-        if (event.origin !== window.location.origin && !allowedOrigins.includes(event.origin.toLowerCase())) return;
+        // frame-ancestors already keeps unlisted sites from framing the page;
+        // this keeps the page from talking to one if that header is lost. With
+        // no list, any site may embed it.
+        if (allowedOrigins.length > 0 && event.origin !== window.location.origin && !allowedOrigins.includes(event.origin.toLowerCase())) return;
         parentOrigin = event.origin;
         waiting.splice(0).forEach((resolve) => resolve());
         post({ type: "lq:meta", name: companyName });

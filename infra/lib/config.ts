@@ -12,6 +12,8 @@ export type Config = {
   dashboardOrigin: string;
   /** The SES-verified address lead alerts are sent from. */
   sesFrom: string;
+  /** Where the website's contact form is emailed. Unset: the form says it is unavailable. */
+  contactTo: string | undefined;
   /** The snapshot the cluster in LqState is restored from. Once set, never changed: a new one replaces the database. */
   databaseSnapshot?: string;
   /** Before `databaseSnapshot` is set: the cluster infra/scripts/bootstrap-db.ts made, outside CloudFormation. */
@@ -39,6 +41,8 @@ export function readConfig(app: App): Config {
   const sesFrom = text("sesFrom");
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(sesFrom)) throw new Error('context "sesFrom" must be an email address');
   const optional = (name: string): string | undefined => (app.node.tryGetContext(name) === undefined ? undefined : text(name));
+  const contactTo = optional("contactTo");
+  if (contactTo !== undefined && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactTo)) throw new Error('context "contactTo" must be an email address');
   const databaseSnapshot = optional("databaseSnapshot");
   if (databaseSnapshot !== undefined && !/^arn:aws[a-z-]*:rds:[a-z0-9-]+:\d{12}:cluster-snapshot:[A-Za-z0-9-]+$/.test(databaseSnapshot)) {
     throw new Error('context "databaseSnapshot" must be the ARN of a cluster snapshot (infra/scripts/snapshot-db.ts prints it)');
@@ -65,6 +69,7 @@ export function readConfig(app: App): Config {
     widgetOrigin: origin("widgetOrigin"),
     dashboardOrigin: origin("dashboardOrigin"),
     sesFrom,
+    contactTo,
     databaseSnapshot,
     databaseClusterArn,
     monetization,

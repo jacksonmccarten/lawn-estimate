@@ -1,6 +1,6 @@
 import { expect, expectAccessible, signIn, test } from "./support";
 
-test("embed settings: snippet, allowed sites, brand color", async ({ page, context }) => {
+test("embed settings: snippet, optional site list, brand color", async ({ page, context }) => {
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   await signIn(page, "/settings/embed");
   await expect(page).toHaveTitle(/^Embed settings/);
@@ -20,6 +20,10 @@ test("embed settings: snippet, allowed sites, brand color", async ({ page, conte
   await page.getByRole("button", { name: "Download QR code" }).click();
   expect((await download).suggestedFilename()).toBe("nittany-lawn-quote-qr.png");
   await expect(page.getByRole("status").filter({ hasText: "Downloaded." })).toBeVisible();
+
+  // The seeded company limits its widget to one site, so the optional list is open and says so.
+  await expect(page.getByText("Your widget only works on this site.")).toBeVisible();
+  await expect(page.locator("details.origin-limit")).toHaveAttribute("open", "");
 
   // Allowed sites: an address is reduced to its origin; nonsense and repeats are explained.
   const address = page.getByLabel("Website address to allow");
@@ -61,5 +65,15 @@ test("embed settings: snippet, allowed sites, brand color", async ({ page, conte
   await expect(sites).toHaveCount(1);
   await expect(address).toBeFocused();
   await expect(page.getByRole("status").filter({ hasText: "removed. Save settings to apply." })).toBeVisible();
+  await expectAccessible(page);
+
+  // With no sites listed the widget works on any website, and the list folds away.
+  await page.getByRole("button", { name: "Remove https://www.nittanylawn.example" }).click();
+  await page.getByRole("button", { name: "Save settings" }).click();
+  await expect(page.getByRole("status").filter({ hasText: /Settings saved at/ })).toBeVisible();
+  await page.reload();
+  await expect(page.getByText("Your widget works on any website: Squarespace, Wix, WordPress or your own.")).toBeVisible();
+  await expect(page.locator("details.origin-limit")).not.toHaveAttribute("open", "");
+  await expect(page.getByLabel("Website address to allow")).toBeHidden();
   await expectAccessible(page);
 });

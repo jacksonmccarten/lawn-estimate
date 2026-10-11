@@ -7,7 +7,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import { createApi, type ApiFailure, type ApiResult } from "../lib/api";
 import { createBridge } from "../lib/embed-bridge";
 import { formatAddress, type AddressParts } from "../lib/format";
-import { geocode, type LngLat } from "../lib/mapbox";
+import { geocode, type LngLat, type Shape } from "../lib/mapbox";
 import { createTurnstile, type Turnstile } from "../lib/turnstile";
 import { brandCssVars, type BrandTheme } from "../theme/brand";
 import {
@@ -36,7 +36,7 @@ export type WidgetProps = {
 };
 
 /** The property as the aerial photo screen needs it, kept so coming back to that screen restores the outline. */
-type Yard = { center: LngLat; zip: string; rings: LngLat[][] };
+type Yard = { center: LngLat; zip: string; shapes: Shape[] };
 // `zip` is the one the homeowner typed in the address.
 
 type Step =
@@ -200,7 +200,7 @@ export function Widget({ company, brand, allowedOrigins, apiBase, turnstileSiteK
     setBusy(null);
     if (!place) return askLotSize("no_photo");
     // The zip decides the tax county. It is the one typed, never one a geocoder suggests (R16).
-    setYard({ center: place.center, zip: parts.zip.trim(), rings: [] });
+    setYard({ center: place.center, zip: parts.zip.trim(), shapes: [] });
     setStep({ kind: "yard" });
   }
 
@@ -275,13 +275,13 @@ export function Widget({ company, brand, allowedOrigins, apiBase, turnstileSiteK
           address={address}
           token={mapboxToken}
           center={yard.center}
-          initialRings={yard.rings}
+          initialShapes={yard.shapes}
           busy={busy !== null}
           alert={alert}
           onChangeAddress={restart}
           onUseLotSize={() => askLotSize("chosen")}
-          onSubmit={(sqft, rings) => {
-            setYard({ ...yard, rings });
+          onSubmit={(sqft, shapes) => {
+            setYard({ ...yard, shapes });
             void estimate({ zip: yard.zip, size: { kind: "drawn", sqft } });
           }}
         />

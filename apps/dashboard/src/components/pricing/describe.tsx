@@ -1,6 +1,7 @@
 import type { PricingVersionContent, PricingVersionDiff, Service, Tier } from "@lq/api-contract";
 import type { ReactNode } from "react";
 import { formatCents, formatRatePer1000, formatSqft } from "@/lib/money";
+import { categoriesOf, mowingService, rangeLabel } from "@/lib/pricing-form";
 import { TableScroll } from "../ui";
 
 export const tierRange = (t: Tier) => `Over ${formatSqft(t.minSqft)}, up to ${formatSqft(t.maxSqft)}`;
@@ -11,61 +12,42 @@ const seasonLabel = (s: Service) => (s.season === "growing" ? "Growing season" :
 
 /** A version's content, read-only: what a published version looks like. */
 export function VersionContent({ content }: { content: PricingVersionContent }) {
-  const serviceName = (code: string) => content.services.find((s) => s.code === code)?.name ?? code;
+  const service = mowingService(content);
+  const categories = categoriesOf(content);
   return (
     <div className="stack">
       <dl className="details">
-        <dt>Minimum charge</dt>
-        <dd>{formatCents(content.minChargeCents)}</dd>
+        <dt>Service</dt>
+        <dd>
+          {service.name} ({taxLabel(service).toLowerCase()})
+        </dd>
+        {content.minChargeCents > 0 && (
+          <>
+            <dt>Minimum charge</dt>
+            <dd>{formatCents(content.minChargeCents)}</dd>
+          </>
+        )}
       </dl>
-      <TableScroll label="Services table">
+      <TableScroll label="Lawn size categories table">
         <table className="table">
-          <caption>Services</caption>
+          <caption>Lawn size categories</caption>
           <thead>
             <tr>
-              <th scope="col">Name</th>
-              <th scope="col">Code</th>
-              <th scope="col">Sales tax</th>
-              <th scope="col">Season</th>
-            </tr>
-          </thead>
-          <tbody>
-            {content.services.map((s) => (
-              <tr key={s.code}>
-                <th scope="row">{s.name}</th>
-                <td>
-                  <code>{s.code}</code>
-                </td>
-                <td>{taxLabel(s)}</td>
-                <td>{seasonLabel(s)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </TableScroll>
-      <TableScroll label="Tiers table">
-        <table className="table">
-          <caption>Tiers</caption>
-          <thead>
-            <tr>
-              <th scope="col">Service</th>
-              <th scope="col">Region group</th>
-              <th scope="col">Lawn area</th>
+              <th scope="col">Lawn size category</th>
               <th scope="col">Price</th>
             </tr>
           </thead>
           <tbody>
-            {content.tiers.map((t, i) => (
+            {categories.map((t, i) => (
               <tr key={i}>
-                <th scope="row">{serviceName(t.serviceCode)}</th>
-                <td>{t.regionGroup}</td>
-                <td>{tierRange(t)}</td>
+                <th scope="row">{rangeLabel(t.minSqft, t.maxSqft)}</th>
                 <td>{tierPrice(t)}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </TableScroll>
+      {categories.length === 0 && <p className="muted">No lawn mowing prices in this version.</p>}
     </div>
   );
 }
