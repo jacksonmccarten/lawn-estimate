@@ -150,7 +150,7 @@ export type SubmitResponse = z.infer<typeof SubmitResponse>;
 
 /**
  * The public website's contact form, from the dashboard's own origin. The
- * message is emailed to the InstaQuoter AI team; nothing is stored.
+ * message is emailed to the InstaQuotesAI team; nothing is stored.
  */
 export const ContactRequest = z.strictObject({
   name: z.string().trim().min(1).max(120),

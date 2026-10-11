@@ -1,5 +1,5 @@
 // POST /contact: the public website's contact form. The message is emailed
-// to the InstaQuoter AI team through SES and not stored. With no inbox
+// to the InstaQuotesAI team through SES and not stored. With no inbox
 // configured, or when the email cannot be sent, the answer is 503
 // contact_unavailable, so the form never claims a message went out when it
 // did not. The visitor's details are never logged.
@@ -24,7 +24,7 @@ export type ContactDeps = {
 export function renderContactEmail(req: Pick<ContactRequest, "name" | "email" | "message">): Omit<EmailMessage, "to"> {
   return {
     subject: `Website contact form: ${req.name}`,
-    text: [`From: ${req.name} <${req.email}>`, "", req.message, "", "Sent from the contact form on the InstaQuoter AI website."].join("\n"),
+    text: [`From: ${req.name} <${req.email}>`, "", req.message, "", "Sent from the contact form on the InstaQuotesAI website."].join("\n"),
   };
 }
 
