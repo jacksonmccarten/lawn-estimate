@@ -20,7 +20,10 @@ import {
   type PricingVersionContent,
   type PricingVersionDiff,
   type PricingVersionList,
+  type Questionnaire,
   type Regions,
+  type ServiceAreaSettings,
+  type ServiceRadius,
   type UpdateCompanyRequest,
   type Usage,
   type ZipsNear,
@@ -94,6 +97,12 @@ export function createApi({ baseUrl, getToken, onUnauthenticated }: ApiOptions) 
     getRegions: (): Promise<Regions> => call("getRegions"),
     /** Replaces the whole list. */
     replaceRegions: (body: Regions): Promise<Regions> => call("replaceRegions", { body }),
+    getQuestionnaire: (): Promise<Questionnaire> => call("getQuestionnaire"),
+    /** Replaces the whole list. */
+    replaceQuestionnaire: (body: Questionnaire): Promise<Questionnaire> => call("replaceQuestionnaire", { body }),
+    getServiceArea: (): Promise<ServiceAreaSettings> => call("getServiceArea"),
+    /** Stores the address and radius and replaces the regions with the zips inside. 400 if the zip has no location. */
+    replaceServiceArea: (body: ServiceRadius): Promise<ServiceAreaSettings> => call("replaceServiceArea", { body }),
     /** The zip codes within `miles` of the centre of `zip`, nearest first. 400 if the zip has no location. */
     zipsNear: (query: { zip: string; miles: number }): Promise<ZipsNear> => call("getZipsNear", { query: { zip: query.zip, miles: String(query.miles) } }),
     listPricingVersions: (): Promise<PricingVersionList> => call("listPricingVersions"),

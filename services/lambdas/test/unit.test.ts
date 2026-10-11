@@ -17,12 +17,13 @@ import {
   zipFromAddress,
 } from "../src/public/grass.js";
 import { NO_EDGE, throughEdge } from "../src/public/edge.js";
+import { createContactHandler, renderContactEmail } from "../src/public/contact.js";
 import { createNotifier, renderLeadEmail, renderLeadSms, type LeadAlert } from "../src/public/notify.js";
 import { createRegridLookup, parseAddressResponse } from "../src/public/regrid.js";
 import { isHoneypotHit } from "../src/public/submit.js";
 import { createTokenCodec, TOKEN_TTL_SECONDS } from "../src/public/token.js";
 import { createTurnstile } from "../src/public/turnstile.js";
-import { event } from "./harness.js";
+import { event, read } from "./harness.js";
 
 const fakeFetch = (status: number, body: unknown, seen?: { url?: string; body?: string }) =>
   (async (url: URL | string, init?: RequestInit) => {
@@ -418,5 +419,59 @@ describe("the CloudFront edge check", () => {
     } catch (error) {
       expect((error as HttpError).code).toBe("forbidden");
     }
+  });
+});
+
+describe("POST /contact", () => {
+  const SITE = "https://app.example.com";
+  const good = { name: "Pat Doe", email: "pat@example.com", message: "Do you work with snow removal companies?", turnstile: "tok" };
+  const setup = (options: { inbox?: boolean; turnstile?: "ok" | "failed" | "unavailable"; sendFails?: boolean } = {}) => {
+    const sent: { to: string; subject: string; text: string }[] = [];
+    const logs: { level: string; event: string; fields?: unknown }[] = [];
+    const handler = createContactHandler({
+      turnstile: async () => options.turnstile ?? "ok",
+      inbox:
+        options.inbox === false
+          ? null
+          : {
+              to: "team@example.com",
+              send: async (m) => {
+                if (options.sendFails) throw new Error("ses down");
+                sent.push(m);
+              },
+            },
+      siteOrigin: SITE,
+      edge: NO_EDGE,
+      log: (level, ev, fields) => logs.push({ level, event: ev, fields }),
+    });
+    const post = async (body: unknown, origin = SITE) => read(await handler(event({ routeKey: "POST /contact", body, headers: { origin } })));
+    return { post, sent, logs };
+  };
+
+  it("emails the message to the team, and logs nothing of the visitor", async () => {
+    const { post, sent, logs } = setup();
+    expect(await post(good)).toEqual({ status: 200, body: { status: "sent" } });
+    expect(sent).toEqual([{ to: "team@example.com", ...renderContactEmail(good) }]);
+    expect(sent[0]!.text).toContain("From: Pat Doe <pat@example.com>");
+    expect(JSON.stringify(logs)).not.toMatch(/Pat|pat@example|snow/);
+  });
+
+  it("says it is unavailable, never sent, when no inbox is configured or SES fails", async () => {
+    for (const options of [{ inbox: false }, { sendFails: true }]) {
+      const { post } = setup(options);
+      const res = await post(good);
+      expect([res.status, res.body.error.code]).toEqual([503, "contact_unavailable"]);
+    }
+  });
+
+  it("refuses another origin, a failed Turnstile and bad input; a honeypot sends nothing", async () => {
+    const { post, sent } = setup();
+    expect((await post(good, "https://evil.example")).status).toBe(403);
+    expect((await setup({ turnstile: "failed" }).post(good)).body.error.code).toBe("turnstile_failed");
+    for (const bad of [{ ...good, email: "nope" }, { ...good, message: " " }, { ...good, name: "" }, { ...good, extra: 1 }]) {
+      expect((await post(bad)).status).toBe(400);
+    }
+    expect((await post({ ...good, website: "spam" })).status).toBe(200);
+    expect(sent).toHaveLength(0);
   });
 });

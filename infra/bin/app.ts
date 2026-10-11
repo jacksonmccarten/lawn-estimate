@@ -12,9 +12,9 @@ const app = new App();
 const config = readConfig(app);
 const env = { account: process.env.CDK_DEFAULT_ACCOUNT, region: config.region };
 
-const state = new StateStack(app, "LqState", { env, config, description: "Instant Lawn Quote: logins, secrets and user pool" });
+const state = new StateStack(app, "LqState", { env, config, description: "InstaQuotesAI: logins, secrets and user pool" });
 // CloudFront reads certificates and web ACLs from us-east-1 only.
 const edge = config.edge
-  ? new EdgeStack(app, "LqEdge", { env: { account: env.account, region: "us-east-1" }, edge: config.edge, description: "Instant Lawn Quote: the API's certificate and WAF rules" })
+  ? new EdgeStack(app, "LqEdge", { env: { account: env.account, region: "us-east-1" }, edge: config.edge, description: "InstaQuotesAI: the API's certificate and WAF rules" })
   : undefined;
-new ApiStack(app, "LqApi", { env, config, state, edge, description: "Instant Lawn Quote: HTTP API, Lambdas, and the CloudFront distribution in front of them" });
+new ApiStack(app, "LqApi", { env, config, state, edge, description: "InstaQuotesAI: HTTP API, Lambdas, and the CloudFront distribution in front of them" });

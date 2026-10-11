@@ -84,9 +84,10 @@ export class ApiStack extends Stack {
           externalModules: ["@aws-sdk/*", "pg", "pg-native"],
         },
         ...options,
-        environment: { ...database, NODE_OPTIONS: "--enable-source-maps", ...options.environment },
+        // A function with no database login gets neither the database's address nor the Data API.
+        environment: { ...(logins.length > 0 ? database : {}), NODE_OPTIONS: "--enable-source-maps", ...options.environment },
       });
-      func.addToRolePolicy(new iam.PolicyStatement({ actions: DATA_API_ACTIONS, resources: [state.clusterArn] }));
+      if (logins.length > 0) func.addToRolePolicy(new iam.PolicyStatement({ actions: DATA_API_ACTIONS, resources: [state.clusterArn] }));
       for (const login of logins) login.grantRead(func);
       return func;
     };
@@ -113,13 +114,27 @@ export class ApiStack extends Stack {
     const estimate = fn("Estimate", "estimate", [state.publicLogin], { environment: publicEnvironment });
     const submit = fn("Submit", "submit", [state.publicLogin], { environment: publicEnvironment });
     for (const func of [estimate, submit]) for (const secret of [...state.appSecrets, ...edgeSecrets]) secret.grantRead(func);
-    submit.addToRolePolicy(
-      new iam.PolicyStatement({
-        actions: ["ses:SendEmail"],
-        resources: [`arn:${this.partition}:ses:${this.region}:${this.account}:identity/*`],
-        conditions: { StringEquals: { "ses:FromAddress": config.sesFrom } },
-      }),
-    );
+    // The website's contact form: Turnstile from the app secrets, and SES to the team's inbox when one is configured.
+    // Behind CloudFront like the other public routes, so it checks the origin-verify header too.
+    const contact = fn("Contact", "contact", [], {
+      environment: {
+        SECRETS_ARN: [...state.appSecrets, ...edgeSecrets].map((s) => s.secretArn).join(","),
+        ...edgeEnvironment,
+        SITE_ORIGIN: config.dashboardOrigin,
+        SES_FROM: config.sesFrom,
+        ...(config.contactTo ? { CONTACT_TO: config.contactTo } : {}),
+      },
+    });
+    for (const secret of [...state.appSecrets, ...edgeSecrets]) secret.grantRead(contact);
+    for (const func of [submit, contact]) {
+      func.addToRolePolicy(
+        new iam.PolicyStatement({
+          actions: ["ses:SendEmail"],
+          resources: [`arn:${this.partition}:ses:${this.region}:${this.account}:identity/*`],
+          conditions: { StringEquals: { "ses:FromAddress": config.sesFrom } },
+        }),
+      );
+    }
     const profile = fn("Profile", "profile", [state.publicLogin], {
       environment: {
         DB_PUBLIC_SECRET_ARN: state.publicLogin.secretArn,
@@ -153,7 +168,7 @@ export class ApiStack extends Stack {
     });
 
     const api = new HttpApi(this, "Api", {
-      description: "Instant Lawn Quote: public estimate and submit routes, and the company API",
+      description: "InstaQuotesAI: public estimate and submit routes, and the company API",
       corsPreflight: {
         allowOrigins: [...new Set([config.widgetOrigin, config.dashboardOrigin])],
         allowMethods: [CorsHttpMethod.GET, CorsHttpMethod.POST, CorsHttpMethod.PUT, CorsHttpMethod.PATCH, CorsHttpMethod.OPTIONS],
@@ -169,6 +184,7 @@ export class ApiStack extends Stack {
       "/estimate": new HttpLambdaIntegration("EstimateIntegration", estimate),
       "/submit": new HttpLambdaIntegration("SubmitIntegration", submit),
       "/profile/{company}": new HttpLambdaIntegration("ProfileIntegration", profile),
+      "/contact": new HttpLambdaIntegration("ContactIntegration", contact),
     } as Record<string, HttpLambdaIntegration>;
     const company = new HttpLambdaIntegration("CompanyApiIntegration", companyApi);
 
@@ -188,7 +204,7 @@ export class ApiStack extends Stack {
       // visitor's headers but Host reach API Gateway, which answers only to
       // its own name; CloudFront adds the origin-verify header.
       const distribution = new cloudfront.Distribution(this, "ApiDistribution", {
-        comment: "Instant Lawn Quote API, behind WAF",
+        comment: "InstaQuotesAI API, behind WAF",
         domainNames: [config.edge.apiDomain],
         certificate: edge.certificate,
         webAclId: edge.webAclArn,

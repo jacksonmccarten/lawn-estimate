@@ -60,7 +60,7 @@ export class StateStack extends Stack {
 
     const { config } = props;
     this.databaseKey = new kms.Key(this, "DatabaseKey", {
-      description: "Instant Lawn Quote database storage and snapshots",
+      description: "InstaQuotesAI database storage and snapshots",
       enableKeyRotation: true,
       removalPolicy: RemovalPolicy.RETAIN,
     });
@@ -138,8 +138,8 @@ export class StateStack extends Stack {
       autoVerify: { email: true },
       userVerification: {
         emailStyle: cognito.VerificationEmailStyle.CODE,
-        emailSubject: "Your Instant Lawn Quote code",
-        emailBody: "Your Instant Lawn Quote verification code is {####}. It expires in 24 hours.",
+        emailSubject: "Your InstaQuotesAI code",
+        emailBody: "Your InstaQuotesAI verification code is {####}. It expires in 24 hours.",
       },
       // Password only for now. An authenticator app stays available to an
       // account that sets one up; text-message codes wait on a paid AWS plan

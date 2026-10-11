@@ -6,6 +6,8 @@
 // The token is a Mapbox public token (pk.), which is made to be sent to
 // browsers; it is restricted to our origins in the Mapbox account.
 
+import polygonClipping, { type MultiPolygon, type Polygon } from "polygon-clipping";
+
 export type LngLat = { lng: number; lat: number };
 
 /** A static image: what is at its center, how far in, and its size in CSS pixels. */
@@ -90,6 +92,51 @@ export function ringSqft(ring: LngLat[]): number {
 /** Every outline with at least three corners, added up and rounded to a whole square foot. */
 export function totalSqft(rings: LngLat[][]): number {
   return Math.round(rings.reduce((sum, ring) => sum + ringSqft(ring), 0));
+}
+
+/** An outline the homeowner drew: grass to mow (`include`), or something inside it to leave out (`exclude`). */
+export type Shape = { kind: "include" | "exclude"; ring: LngLat[] };
+
+function shoelace(ring: [number, number][]): number {
+  let twice = 0;
+  for (let i = 0; i < ring.length; i++) {
+    const [ax, ay] = ring[i]!;
+    const [bx, by] = ring[(i + 1) % ring.length]!;
+    twice += ax * by - bx * ay;
+  }
+  return Math.abs(twice) / 2;
+}
+
+/**
+ * The lawn: every include outline joined together, less whatever of the
+ * exclude outlines falls inside it, in square feet rounded to a whole one.
+ * Overlapping include outlines count once, and an exclude outline only takes
+ * away the part that overlaps grass. Laid out in metres around the shapes'
+ * own latitude, as in `ringSqft`.
+ */
+export function lawnSqft(shapes: Shape[]): number {
+  const drawn = shapes.filter((s) => s.ring.length >= 3);
+  const includes = drawn.filter((s) => s.kind === "include");
+  if (includes.length === 0) return 0;
+  const zoom = 20;
+  const all = drawn.flatMap((s) => s.ring);
+  const meanLat = all.reduce((sum, p) => sum + p.lat, 0) / all.length;
+  const metresPerPixel = (EARTH_CIRCUMFERENCE_M * Math.cos((meanLat * Math.PI) / 180)) / worldSize(zoom);
+  const toPolygon = (ring: LngLat[]): Polygon => [
+    ring.map((p) => {
+      const w = toWorld(p, zoom);
+      return [w.x, w.y] as [number, number];
+    }),
+  ];
+  const [first, ...rest] = includes.map((s) => toPolygon(s.ring));
+  let lawn: MultiPolygon = polygonClipping.union(first!, ...rest);
+  const excludes = drawn.filter((s) => s.kind === "exclude").map((s) => toPolygon(s.ring));
+  if (excludes.length > 0) lawn = polygonClipping.difference(lawn, ...excludes);
+  const pixels = lawn.reduce(
+    (sum, [outer, ...holes]) => sum + shoelace(outer!) - holes.reduce((h, hole) => h + shoelace(hole), 0),
+    0,
+  );
+  return Math.round(pixels * metresPerPixel ** 2 * SQFT_PER_SQM);
 }
 
 // ---- The two calls

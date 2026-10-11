@@ -1,8 +1,8 @@
-// GET/PATCH /company, GET/PUT /regions, GET /usage. Every statement runs
+// GET/PATCH /company, GET/PUT /regions, GET/PUT /service-area, GET/PUT /questionnaire, GET /usage. Every statement runs
 // inside withCompany, so RLS has already narrowed each table to the caller's
 // company; the WHERE clauses name no company unless a row count depends on it.
 
-import type { Company, Regions, UpdateCompanyRequest, Usage, ZipsNear, ZipsNearQuery } from "@lq/api-contract";
+import { RADIUS_REGION_GROUP, type Company, type Questionnaire, type Regions, type ServiceAreaSettings, type ServiceRadius, type UpdateCompanyRequest, type Usage, type ZipsNear, type ZipsNearQuery } from "@lq/api-contract";
 import type { DbTx } from "@lq/db";
 import { fromJson, HttpError } from "../http.js";
 
@@ -107,6 +107,60 @@ export async function zipsNear(tx: DbTx, query: ZipsNearQuery): Promise<ZipsNear
   // The centre is always within range of itself, so no row means no such zip.
   if (res.rows.length === 0) throw new HttpError("invalid_request", "that zip code is not one we have a location for", { zip: "unknown zip" });
   return { zip: query.zip, miles: query.miles, zips: res.rows.map((r) => r.zip) };
+}
+
+export async function getQuestionnaire(tx: DbTx): Promise<Questionnaire> {
+  const res = await tx.query<{ questionnaire: unknown }>("SELECT questionnaire FROM companies");
+  const row = res.rows[0];
+  if (!row) throw new HttpError("not_found", "no such company");
+  return { questions: fromJson<Questionnaire["questions"]>(row.questionnaire) };
+}
+
+export async function replaceQuestionnaire(tx: DbTx, companyId: string, body: Questionnaire): Promise<Questionnaire> {
+  const res = await tx.query("UPDATE companies SET questionnaire = $2::jsonb WHERE id = $1", [companyId, JSON.stringify(body.questions)]);
+  if (res.rowCount !== 1) throw new HttpError("not_found", "no such company");
+  return getQuestionnaire(tx);
+}
+
+export async function getServiceArea(tx: DbTx): Promise<ServiceAreaSettings> {
+  const res = await tx.query<{
+    service_street: string | null;
+    service_city: string | null;
+    service_state: string | null;
+    service_zip: string | null;
+    // numeric arrives as text from either driver.
+    service_radius_miles: string | null;
+    zip_count: number;
+  }>(
+    `SELECT service_street, service_city, service_state, service_zip, service_radius_miles::text AS service_radius_miles,
+            (SELECT count(*)::int FROM service_regions WHERE kind = 'zip') AS zip_count
+     FROM companies`,
+  );
+  const row = res.rows[0];
+  if (!row) throw new HttpError("not_found", "no such company");
+  const radius =
+    row.service_street && row.service_city && row.service_state && row.service_zip && row.service_radius_miles
+      ? { street: row.service_street, city: row.service_city, state: row.service_state, zip: row.service_zip, miles: Number(row.service_radius_miles) }
+      : null;
+  return { radius, zipCount: Number(row.zip_count) };
+}
+
+/**
+ * Sets the business address and radius, and replaces every region with the
+ * zips within the radius of the address's zip, in one region group. An
+ * unknown zip changes nothing (zipsNear refuses it first).
+ */
+export async function replaceServiceArea(tx: DbTx, companyId: string, body: ServiceRadius): Promise<ServiceAreaSettings> {
+  const miles = Math.round(body.miles * 10) / 10;
+  const near = await zipsNear(tx, { zip: body.zip, miles });
+  await replaceRegions(tx, companyId, { regions: near.zips.map((value) => ({ kind: "zip", value, tierGroup: RADIUS_REGION_GROUP })) });
+  const res = await tx.query(
+    `UPDATE companies SET service_street = $2, service_city = $3, service_state = $4, service_zip = $5, service_radius_miles = $6
+     WHERE id = $1`,
+    [companyId, body.street, body.city, body.state, body.zip, miles],
+  );
+  if (res.rowCount !== 1) throw new HttpError("not_found", "no such company");
+  return getServiceArea(tx);
 }
 
 export async function getUsage(tx: DbTx): Promise<Usage> {

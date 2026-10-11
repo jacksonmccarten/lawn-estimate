@@ -7,10 +7,10 @@
 //   2. Known bad inputs (Log4j and the like).
 //   3. The core rule set, with the body-size rule counting only: a Stripe
 //      webhook can carry more than its 8 KB.
-//   4. /estimate and /submit: 100 requests per 5 minutes per address.
+//   4. /estimate, /submit and /contact: 100 requests per 5 minutes per address.
 //   5. Everything but /profile: 1,000 per 5 minutes per address. /profile is
 //      called by the widget app's server, from a few shared addresses.
-//   6. Bot Control (common), on /estimate and /submit only: the widget's
+//   6. Bot Control (common), on /estimate, /submit and /contact only: the widget's
 //      server and Stripe are not browsers and must not be judged as bots.
 // A request a rate rule stops gets the contract's 429 rate_limited body.
 
@@ -21,7 +21,7 @@ import * as wafv2 from "aws-cdk-lib/aws-wafv2";
 import type { Construct } from "constructs";
 import type { EdgeConfig } from "./config.js";
 
-const PUBLIC_POSTS = ["/estimate", "/submit"];
+const PUBLIC_POSTS = ["/estimate", "/submit", "/contact"];
 
 const pathStartsWith = (path: string): wafv2.CfnWebACL.StatementProperty => ({
   byteMatchStatement: {
@@ -75,7 +75,7 @@ export class EdgeStack extends Stack {
     });
 
     const acl = new wafv2.CfnWebACL(this, "ApiAcl", {
-      description: "Instant Lawn Quote API: reputation, bad inputs, core rules, per-address rate limits, bot control on the public routes",
+      description: "InstaQuotesAI API: reputation, bad inputs, core rules, per-address rate limits, bot control on the public routes",
       scope: "CLOUDFRONT",
       defaultAction: { allow: {} },
       customResponseBodies: {

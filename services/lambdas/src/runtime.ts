@@ -16,7 +16,9 @@
 //                          plain PostgreSQL instead (local runs).
 //   WIDGET_ORIGIN          https://w.<domain>; other origins are refused.
 //   DASHBOARD_URL          https://app.<domain>, for links in lead alerts.
-//   SES_FROM               the verified sender of lead alerts.
+//   SES_FROM               the verified sender of lead alerts and contact messages.
+//   CONTACT_TO             where the website's contact form is emailed. Unset:
+//                          the form answers contact_unavailable.
 //   SMS_ALERTS_ENABLED     "true" once 10DLC registration has cleared.
 //   REGRID_BASE_URL        optional override.
 //   MONETIZATION_APP_ID, MONETIZATION_ENDPOINT
@@ -33,7 +35,8 @@ import { log } from "./log.js";
 import type { PublicDeps } from "./public/deps.js";
 import type { Edge } from "./public/edge.js";
 import { createEstimateHandler } from "./public/estimate.js";
-import { createNotifier } from "./public/notify.js";
+import { createContactHandler } from "./public/contact.js";
+import { createNotifier, type EmailMessage } from "./public/notify.js";
 import { createProfileHandler } from "./public/profile.js";
 import { createRegridLookup } from "./public/regrid.js";
 import { createSubmitHandler } from "./public/submit.js";
@@ -74,9 +77,21 @@ function edgeFrom(env: Env): Edge {
   return { secret: env.ORIGIN_VERIFY_SECRET || null, enforce: env.ORIGIN_VERIFY_ENFORCE === "true" };
 }
 
+function sesSender(from: string): (message: EmailMessage) => Promise<void> {
+  const ses = new SESv2Client({});
+  return async ({ to, subject, text }) => {
+    await ses.send(
+      new SendEmailCommand({
+        FromEmailAddress: from,
+        Destination: { ToAddresses: [to] },
+        Content: { Simple: { Subject: { Data: subject }, Body: { Text: { Data: text } } } },
+      }),
+    );
+  };
+}
+
 async function publicDeps(): Promise<PublicDeps> {
   const env = await loadEnv();
-  const ses = new SESv2Client({});
   const sns = new SNSClient({});
   const from = required(env, "SES_FROM");
   const regridToken = env.REGRID_TOKEN;
@@ -90,15 +105,7 @@ async function publicDeps(): Promise<PublicDeps> {
       : null,
     tokens: createTokenCodec(required(env, "QUOTE_TOKEN_SECRET")),
     notifier: createNotifier({
-      sendEmail: async ({ to, subject, text }) => {
-        await ses.send(
-          new SendEmailCommand({
-            FromEmailAddress: from,
-            Destination: { ToAddresses: [to] },
-            Content: { Simple: { Subject: { Data: subject }, Body: { Text: { Data: text } } } },
-          }),
-        );
-      },
+      sendEmail: sesSender(from),
       sendSms: async ({ to, text }) => {
         await sns.send(
           new PublishCommand({
@@ -128,6 +135,18 @@ function lazy<E, R>(build: () => Promise<(event: E) => Promise<R>>): (event: E) 
 
 export const estimate = lazy(async () => createEstimateHandler(await publicDeps()));
 export const submit = lazy(async () => createSubmitHandler(await publicDeps()));
+export const contact = lazy(async () => {
+  const env = await loadEnv();
+  const to = env.CONTACT_TO;
+  if (!to) log("warn", "contact_not_configured");
+  return createContactHandler({
+    turnstile: createTurnstile({ secret: required(env, "TURNSTILE_SECRET") }),
+    inbox: to ? { to, send: sesSender(required(env, "SES_FROM")) } : null,
+    siteOrigin: env.SITE_ORIGIN ?? null,
+    edge: edgeFrom(env),
+    log,
+  });
+});
 // The database, and the origin-verify secret only.
 export const profile = lazy(async () => {
   const env = await loadEnv();

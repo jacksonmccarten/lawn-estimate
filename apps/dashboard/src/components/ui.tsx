@@ -44,7 +44,7 @@ export function PageHeading({ title, children }: { title: string; children?: Rea
   return (
     <div className="page-heading">
       {/* React hoists this into the head; Next's route announcer reads it out. */}
-      <title>{`${title} · Instant Lawn Quote`}</title>
+      <title>{`${title} · InstaQuotesAI`}</title>
       <h1 ref={ref} tabIndex={-1}>
         {title}
       </h1>

@@ -10,8 +10,12 @@ function directive(csp: string, name: string): string | undefined {
 }
 
 describe("frame-ancestors", () => {
-  it("is 'self' alone for an empty allowlist: the hosted page works, an embed does not", () => {
-    expect(frameAncestors([])).toBe("frame-ancestors 'self'");
+  it("lets any site embed the widget when the company lists none", () => {
+    expect(frameAncestors([])).toBe("frame-ancestors *");
+  });
+
+  it("is 'self' alone for an unknown company", () => {
+    expect(frameAncestors(null)).toBe("frame-ancestors 'self'");
   });
 
   it("lists the company's origins", () => {

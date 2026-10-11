@@ -470,6 +470,100 @@ describe("GET /zips-near", () => {
   });
 });
 
+describe("/questionnaire", () => {
+  const yesNo = (id: string, text: string, required = true) => ({ id, text, kind: "yes_no", options: [], required });
+
+  it("starts every company with the five example questions", async () => {
+    const { status, body } = await call(alpha, "GET /questionnaire");
+    expect(status).toBe(200);
+    expect(body.questions.map((q: { text: string }) => q.text)).toEqual([
+      "Do you have any gates narrower than 60 inches?",
+      "Does your property have any steep hills?",
+      "Does your property have a swimming pool?",
+      "Are there any obstacles that could make mowing difficult?",
+      "Is your backyard accessible to standard lawn mowing equipment?",
+    ]);
+    expect(body.questions.every((q: { kind: string; required: boolean }) => q.kind === "yes_no" && q.required)).toBe(true);
+  });
+
+  it("replaces the list as a whole, in order, for the caller's company only", async () => {
+    const questions = [
+      { id: "0f8a7b1c-1111-4c2d-8e3f-000000000002", text: "How tall is the grass now?", kind: "choice", options: ["Under 4 inches", "4 to 8 inches", "Over 8 inches"], required: false },
+      yesNo("0f8a7b1c-1111-4c2d-8e3f-000000000001", "Do you have a dog?"),
+    ];
+    const { status, body } = await call(bravo, "PUT /questionnaire", { body: { questions } });
+    expect([status, body]).toEqual([200, { questions }]);
+    expect((await call(bravo, "GET /questionnaire")).body).toEqual({ questions });
+    expect((await call(alpha, "GET /questionnaire")).body.questions).toHaveLength(5);
+    // An empty questionnaire is allowed: homeowners are asked nothing.
+    expect((await call(bravo, "PUT /questionnaire", { body: { questions: [] } })).body).toEqual({ questions: [] });
+  });
+
+  it("refuses a malformed question and changes nothing", async () => {
+    const before = (await call(alpha, "GET /questionnaire")).body;
+    const id = "0f8a7b1c-1111-4c2d-8e3f-000000000003";
+    for (const bad of [
+      [{ ...yesNo(id, "Pool?"), options: ["Yes"] }],
+      [{ id, text: "Grass?", kind: "choice", options: ["Short"], required: true }],
+      [{ id, text: "Grass?", kind: "choice", options: ["Short", "short"], required: true }],
+      [yesNo(id, "")],
+      [yesNo(id, "A"), yesNo(id, "B")],
+      [yesNo("not-a-uuid", "Pool?")],
+      Array.from({ length: 21 }, (_, i) => yesNo(`0f8a7b1c-1111-4c2d-8e3f-${String(i).padStart(12, "0")}`, `Q${i}`)),
+    ]) {
+      const res = await call(alpha, "PUT /questionnaire", { body: { questions: bad } });
+      expect([res.status, res.body.error.code], JSON.stringify(bad).slice(0, 80)).toEqual([400, "invalid_request"]);
+    }
+    expect((await call(alpha, "GET /questionnaire")).body).toEqual(before);
+    expect((await call(null, "GET /questionnaire")).status).toBe(401);
+  });
+});
+
+describe("/service-area", () => {
+  const home = { street: "123 College Ave", city: "State College", state: "pa", zip: "16801", miles: 5 };
+
+  it("is unset until the owner gives an address and radius", async () => {
+    const { status, body } = await call(bravo, "GET /service-area");
+    expect(status).toBe(200);
+    expect(body.radius).toBeNull();
+  });
+
+  it("stores the address and radius, and makes the zips within it the only regions", async () => {
+    const { status, body } = await call(bravo, "PUT /service-area", { body: home });
+    expect(status).toBe(200);
+    expect(body.radius).toEqual({ ...home, state: "PA" });
+    const within = (await call(bravo, "GET /zips-near", { query: { zip: "16801", miles: "5" } })).body.zips as string[];
+    expect(body.zipCount).toBe(within.length);
+    const regions = (await call(bravo, "GET /regions")).body.regions as { kind: string; value: string; tierGroup: string }[];
+    expect(regions.map((r) => r.value).sort()).toEqual([...within].sort());
+    expect(new Set(regions.map((r) => `${r.kind}:${r.tierGroup}`))).toEqual(new Set(["zip:standard"]));
+    expect((await call(bravo, "GET /service-area")).body).toEqual(body);
+
+    // A wider radius replaces the area; alpha's is untouched.
+    const wider = await call(bravo, "PUT /service-area", { body: { ...home, miles: 25.04 } });
+    expect(wider.body.radius.miles).toBe(25);
+    expect(wider.body.zipCount).toBeGreaterThan(body.zipCount);
+    expect((await call(alpha, "GET /service-area")).body.radius).toBeNull();
+    expect((await call(alpha, "GET /regions")).body.regions).toHaveLength(3);
+  });
+
+  it("refuses an unknown zip, a radius out of range or a short address, and changes nothing", async () => {
+    const before = (await call(bravo, "GET /service-area")).body;
+    for (const bad of [
+      { ...home, zip: "00000" },
+      { ...home, miles: 0 },
+      { ...home, miles: 101 },
+      { ...home, street: "x" },
+      { ...home, state: "Penn" },
+    ]) {
+      const res = await call(bravo, "PUT /service-area", { body: bad });
+      expect([res.status, res.body.error.code], JSON.stringify(bad)).toEqual([400, "invalid_request"]);
+    }
+    expect((await call(bravo, "GET /service-area")).body).toEqual(before);
+    expect((await call(null, "GET /service-area")).status).toBe(401);
+  });
+});
+
 describe("POST /billing/session", () => {
   it("answers 503 when AWS Monetization is not configured", async () => {
     const res = await call(alpha, "POST /billing/session", { body: { page: "plans" } });

@@ -19,6 +19,7 @@ export * from "./company.js";
 export const routes = {
   estimate: { method: "POST", path: "/estimate", auth: "public", request: pub.EstimateRequest, response: pub.EstimateResponse },
   submit: { method: "POST", path: "/submit", auth: "public", request: pub.SubmitRequest, response: pub.SubmitResponse },
+  sendContact: { method: "POST", path: "/contact", auth: "public", request: pub.ContactRequest, response: pub.ContactResponse, errors: { 503: "contact_unavailable" } },
   getProfile: { method: "GET", path: "/profile/{company}", auth: "public", response: pub.PublicProfile },
 
   getCompany: { method: "GET", path: "/company", auth: "owner", response: company.Company },
@@ -26,6 +27,10 @@ export const routes = {
   createCompany: { method: "POST", path: "/company", auth: "owner", request: company.CreateCompanyRequest, response: company.Company, errors: { 409: "conflict" } },
   getRegions: { method: "GET", path: "/regions", auth: "owner", response: company.Regions },
   replaceRegions: { method: "PUT", path: "/regions", auth: "owner", request: company.Regions, response: company.Regions },
+  getQuestionnaire: { method: "GET", path: "/questionnaire", auth: "owner", response: company.Questionnaire },
+  replaceQuestionnaire: { method: "PUT", path: "/questionnaire", auth: "owner", request: company.Questionnaire, response: company.Questionnaire },
+  getServiceArea: { method: "GET", path: "/service-area", auth: "owner", response: company.ServiceAreaSettings },
+  replaceServiceArea: { method: "PUT", path: "/service-area", auth: "owner", request: company.ServiceRadius, response: company.ServiceAreaSettings },
   getZipsNear: { method: "GET", path: "/zips-near", auth: "owner", query: company.ZipsNearQuery, response: company.ZipsNear },
 
   listPricingVersions: { method: "GET", path: "/pricing-versions", auth: "owner", response: company.PricingVersionList },

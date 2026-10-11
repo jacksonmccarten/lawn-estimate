@@ -11,7 +11,7 @@ import { AuthError } from "@/lib/auth/types";
 
 /** Only a path on this site: `next` comes from the URL. */
 function safeNext(next: string | null): string {
-  return next && /^\/(?!\/)/.test(next) && !next.startsWith("/sign-in") ? next : "/leads";
+  return next && /^\/(?!\/)/.test(next) && !next.startsWith("/sign-in") && !next.startsWith("/login") ? next : "/leads";
 }
 
 function SignIn() {
@@ -100,9 +100,9 @@ function SignIn() {
 
   return (
     <main className="centered">
-      <title>{"Sign in · Instant Lawn Quote"}</title>
+      <title>{"Sign in · InstaQuotesAI"}</title>
       <div className="card sign-in">
-        <p className="brand-name">Instant Lawn Quote</p>
+        <p className="brand-name">InstaQuotesAI</p>
         <h1 ref={headingRef} tabIndex={-1}>
           {step === "password" ? "Sign in" : step === "totp" ? "Enter your code" : "Set up your authenticator app"}
         </h1>
@@ -147,7 +147,7 @@ function SignIn() {
                   </ol>
                   <p>
                     On this phone already?{" "}
-                    <a href={`otpauth://totp/${encodeURIComponent(`Instant Lawn Quote:${email.trim().toLowerCase()}`)}?secret=${secret}&issuer=${encodeURIComponent("Instant Lawn Quote")}`}>
+                    <a href={`otpauth://totp/${encodeURIComponent(`InstaQuotesAI:${email.trim().toLowerCase()}`)}?secret=${secret}&issuer=${encodeURIComponent("InstaQuotesAI")}`}>
                       Open it in your authenticator app
                     </a>
                     .

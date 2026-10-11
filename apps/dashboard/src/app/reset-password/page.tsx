@@ -111,9 +111,9 @@ function ResetPassword() {
 
   return (
     <main className="centered">
-      <title>{"Reset your password · Instant Lawn Quote"}</title>
+      <title>{"Reset your password · InstaQuotesAI"}</title>
       <div className="card sign-in">
-        <p className="brand-name">Instant Lawn Quote</p>
+        <p className="brand-name">InstaQuotesAI</p>
         <h1>{step === "request" ? "Reset your password" : "Choose a new password"}</h1>
         {step === "request" ? (
           <p>Enter the email address you sign in with. We’ll email you a code to set a new password.</p>

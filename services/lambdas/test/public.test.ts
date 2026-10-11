@@ -374,6 +374,17 @@ describe("POST /estimate", () => {
       expect(logs).toContainEqual({ level: "warn", event: "origin_refused", fields: { check: "embed", company: "alpha" } });
     });
 
+    it("lets any site embed the widget of a company that lists none", async () => {
+      const setOrigins = (origins: string[]) => db.asCompany(alpha.id, (q) => q.query("UPDATE companies SET allowed_origins = $1 WHERE id = $2", [origins, alpha.id]));
+      await setOrigins([]);
+      try {
+        const anywhere = await post(estimate, estimateBody({ address: newAddress(), embedOrigin: "https://any-site.example" }));
+        expect(anywhere.body.status).toBe("priced");
+      } finally {
+        await setOrigins(["https://joeslawn.com"]);
+      }
+    });
+
     it("refuses a request that does not come from the widget app, when its origin is configured", async () => {
       const strict = createEstimateHandler({ ...deps, widgetOrigin: "https://w.example.com" });
       const refused = await post(strict, estimateBody(), { origin: "https://elsewhere.example" });

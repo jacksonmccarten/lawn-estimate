@@ -37,7 +37,8 @@ The account is on a paid plan (since 2026-10-11).
 | `databaseClusterArn` | The old cluster `bootstrap-db` made; read only by `snapshot-db` |
 | `widgetOrigin` | The widget app's origin. The only browser origin `/estimate` and `/submit` answer |
 | `dashboardOrigin` | The dashboard's origin, for CORS and for the links in lead alerts |
-| `sesFrom` | The SES-verified address lead alerts are sent from |
+| `sesFrom` | The SES-verified address lead alerts and contact messages are sent from |
+| `contactTo` | Optional. Where the website contact form is emailed; unset, the form says it is unavailable |
 | `monetizationAppId` | The AWS Monetization app that sells companies their plan. Its ARN, ending in `/sandbox` for the test copy (test cards, no real charges). Set with `monetizationEndpoint`, or leave both out to run without billing |
 | `monetizationEndpoint` | The AWS Monetization endpoint, as in `.env.monetization` |
 | `zoneName`, `hostedZoneId` | The Route 53 zone the API's name is made in |

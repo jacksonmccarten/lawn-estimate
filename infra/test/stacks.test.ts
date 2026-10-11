@@ -115,7 +115,7 @@ describe("api stack", () => {
 
   it("puts every route behind the Cognito authorizer except the contract's public ones", () => {
     const open = found.filter((r) => r.AuthorizationType === "NONE").map((r) => r.RouteKey).sort();
-    expect(open).toEqual(["GET /profile/{company}", "POST /estimate", "POST /submit"]);
+    expect(open).toEqual(["GET /profile/{company}", "POST /contact", "POST /estimate", "POST /submit"]);
     expect(found.filter((r) => r.AuthorizationType !== "NONE").every((r) => r.AuthorizationType === "JWT")).toBe(true);
   });
 
@@ -191,9 +191,9 @@ describe("api stack", () => {
     });
   });
 
-  it("runs five functions on Node 22, none of them in the VPC", () => {
+  it("runs six functions on Node 22, none of them in the VPC", () => {
     const functions = Object.values(api.findResources("AWS::Lambda::Function")).map((f) => (f as { Properties: Record<string, unknown> }).Properties);
-    expect(functions).toHaveLength(5);
+    expect(functions).toHaveLength(6);
     for (const f of functions) {
       expect(f.Runtime).toBe("nodejs22.x");
       expect(f.VpcConfig).toBeUndefined();
@@ -243,7 +243,7 @@ describe("behind CloudFront and WAF", () => {
       const found = Object.entries(template.findResources("AWS::Lambda::Function")).find(([id]) => id.startsWith(name));
       return (found![1] as { Properties: { Environment: { Variables: Record<string, unknown> } } }).Properties.Environment.Variables;
     };
-    for (const name of ["Estimate", "Submit", "Profile"]) {
+    for (const name of ["Estimate", "Submit", "Profile", "Contact"]) {
       expect(env(logOnly.api, name).ORIGIN_VERIFY_ENFORCE, name).toBe("false");
       expect(env(enforced.api, name).ORIGIN_VERIFY_ENFORCE, name).toBe("true");
       expect(JSON.stringify(env(enforced.api, name).SECRETS_ARN), name).toMatch(/OriginVerifySecret/);
@@ -269,6 +269,21 @@ describe("behind CloudFront and WAF", () => {
         }),
       ]),
     });
+  });
+});
+
+describe("contact form", () => {
+  const contactFn = (stack: Template) =>
+    Object.entries(stack.findResources("AWS::Lambda::Function")).find(([id]) => id.startsWith("Contact"))![1] as { Properties: { Environment: { Variables: Record<string, string> } } };
+
+  it("emails the team only when contactTo is set, and has no database access", () => {
+    const vars = contactFn(api).Properties.Environment.Variables;
+    expect(vars.CONTACT_TO).toBeUndefined();
+    expect(vars.SITE_ORIGIN).toBe("https://app.example.com");
+    expect(vars.DB_RESOURCE_ARN).toBeUndefined();
+    const policies = Object.entries(api.findResources("AWS::IAM::Policy")).filter(([id]) => id.startsWith("Contact")).map(([, p]) => JSON.stringify(p));
+    expect(policies.join("")).toContain("ses:SendEmail");
+    expect(policies.join("")).not.toContain("rds-data:");
   });
 });
 
