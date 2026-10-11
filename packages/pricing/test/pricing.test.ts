@@ -302,3 +302,30 @@ describe("purity and input checks", () => {
     expect(() => priceQuote(input({ version: huge, grassSqft: 2 ** 40 }))).toThrow(/too large/);
   });
 });
+
+describe("flat-rate lawn size categories", () => {
+  // The dashboard's example: five categories, the last open-ended, no minimum charge.
+  const categories: PricingVersion = deepFreeze({
+    id: "flat-1",
+    minChargeCents: 0,
+    services: [{ code: "mow", name: "Lawn mowing", taxable: true }],
+    tiers: [
+      flat("mow", "standard", 0, 2500, 4500),
+      flat("mow", "standard", 2500, 5000, 5000),
+      flat("mow", "standard", 5000, 10000, 6000),
+      flat("mow", "standard", 10000, 15000, 7500),
+      flat("mow", "standard", 15000, 1_000_000_000, 9000),
+    ],
+  });
+  const price = (grassSqft: number) => {
+    const result = priceQuote({ version: categories, serviceCode: "mow", addOnCodes: [], grassSqft, regionGroup: "standard", taxRateBps: 600 });
+    if (!result.ok) throw new Error(result.reason);
+    return result.quote.lines[0]!.amountCents;
+  };
+
+  it("gives the category's flat rate, whatever the size within it", () => {
+    expect([price(100), price(2500), price(2501), price(5000), price(9999), price(15000), price(15001), price(2_000_000)]).toEqual([
+      4500, 4500, 5000, 5000, 6000, 7500, 9000, 9000,
+    ]);
+  });
+});

@@ -6,7 +6,6 @@ import { Link } from "react-aria-components";
 import { useApi } from "@/components/auth-provider";
 import { VersionContent } from "@/components/pricing/describe";
 import { PricingEditor } from "@/components/pricing/editor";
-import { PreviewQuote } from "@/components/pricing/preview";
 import { BusyButton, LoadError, Loading, PageHeading, useToast } from "@/components/ui";
 import { describeError } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
@@ -90,7 +89,6 @@ function Version() {
             )}
             <VersionContent content={version.content} />
           </section>
-          <PreviewQuote versionId={version.id} content={version.content} />
         </div>
       )}
     </>
