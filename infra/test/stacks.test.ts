@@ -1,0 +1,133 @@
+// The synthesized templates, checked for the properties the design depends
+// on. Bundling is off: these tests read CloudFormation, not Lambda code.
+
+import { routes } from "@lq/api-contract";
+import { App } from "aws-cdk-lib";
+import { Match, Template } from "aws-cdk-lib/assertions";
+import { describe, expect, it } from "vitest";
+import { ApiStack } from "../lib/api-stack.js";
+import { readConfig } from "../lib/config.js";
+import { StateStack } from "../lib/state-stack.js";
+
+const context = {
+  "aws:cdk:bundling-stacks": [],
+  "@aws-cdk/core:defaultCrossStackReferences": "strong",
+  region: "us-east-2",
+  databaseClusterArn: "arn:aws:rds:us-east-2:111111111111:cluster:lq-db",
+  widgetOrigin: "https://w.example.com",
+  dashboardOrigin: "https://app.example.com",
+  sesFrom: "alerts@example.com",
+};
+
+function synth() {
+  const app = new App({ context });
+  const config = readConfig(app);
+  const env = { account: "111111111111", region: config.region };
+  const state = new StateStack(app, "LqState", { env, config });
+  const api = new ApiStack(app, "LqApi", { env, config, state });
+  return { state: Template.fromStack(state), api: Template.fromStack(api) };
+}
+
+const { state, api } = synth();
+
+describe("state stack", () => {
+  it("creates no database and no network: the cluster is made outside CloudFormation", () => {
+    state.resourceCountIs("AWS::RDS::DBCluster", 0);
+    state.resourceCountIs("AWS::EC2::VPC", 0);
+    state.hasOutput("OwnerLoginArn", {});
+  });
+
+  it("keeps a login per database role, and the three application secrets apart", () => {
+    // Owner, app_rw, app_public, Turnstile, quote token, IP salt.
+    state.resourceCountIs("AWS::SecretsManager::Secret", 6);
+    for (const username of ["app_owner", "app_rw", "app_public"]) {
+      state.hasResourceProperties("AWS::SecretsManager::Secret", {
+        GenerateSecretString: Match.objectLike({ SecretStringTemplate: JSON.stringify({ username }), GenerateStringKey: "password" }),
+      });
+    }
+  });
+
+  it("has a user pool anyone can sign up to with a verified email, an optional authenticator and the two groups", () => {
+    state.hasResourceProperties("AWS::Cognito::UserPool", {
+      AdminCreateUserConfig: { AllowAdminCreateUserOnly: false },
+      AutoVerifiedAttributes: ["email"],
+      MfaConfiguration: "OPTIONAL",
+      EnabledMfas: ["SOFTWARE_TOKEN_MFA"],
+      UsernameAttributes: ["email"],
+      DeletionProtection: "ACTIVE",
+    });
+    state.hasResourceProperties("AWS::Cognito::UserPoolClient", { GenerateSecret: false, ExplicitAuthFlows: Match.arrayWith(["ALLOW_USER_SRP_AUTH"]) });
+    state.hasResourceProperties("AWS::Cognito::UserPoolGroup", { GroupName: "admin" });
+    state.hasResourceProperties("AWS::Cognito::UserPoolGroup", { GroupName: "owner" });
+  });
+});
+
+describe("api stack", () => {
+  const found = Object.values(api.findResources("AWS::ApiGatewayV2::Route")).map(
+    (r) => (r as { Properties: { RouteKey: string; AuthorizationType: string } }).Properties,
+  );
+
+  it("has exactly the contract's routes", () => {
+    expect(found.map((r) => r.RouteKey).sort()).toEqual(Object.values(routes).map((r) => `${r.method} ${r.path}`).sort());
+  });
+
+  it("puts every route behind the Cognito authorizer except the contract's public ones", () => {
+    const open = found.filter((r) => r.AuthorizationType === "NONE").map((r) => r.RouteKey).sort();
+    expect(open).toEqual(["GET /profile/{company}", "POST /estimate", "POST /submit"]);
+    expect(found.filter((r) => r.AuthorizationType !== "NONE").every((r) => r.AuthorizationType === "JWT")).toBe(true);
+  });
+
+  it("answers the two front ends' browsers and no other origin, and throttles every route", () => {
+    api.hasResourceProperties("AWS::ApiGatewayV2::Api", {
+      CorsConfiguration: Match.objectLike({ AllowOrigins: ["https://w.example.com", "https://app.example.com"] }),
+    });
+    api.hasResourceProperties("AWS::ApiGatewayV2::Stage", { DefaultRouteSettings: { ThrottlingBurstLimit: 20, ThrottlingRateLimit: 10 } });
+  });
+
+  it("gives the schema owner's login to the migrate function alone", () => {
+    const policies = Object.values(api.findResources("AWS::IAM::Policy")).map((p) => JSON.stringify(p));
+    const withOwner = policies.filter((p) => /OwnerLogin/.test(p));
+    expect(withOwner).toHaveLength(1);
+    expect(withOwner[0]).toMatch(/"Roles":\[\{"Ref":"MigrateServiceRole/);
+  });
+
+  it("lets the public functions use the app_public login and never app_rw's", () => {
+    const policy = (role: string) => {
+      const match = Object.values(api.findResources("AWS::IAM::Policy")).map((p) => JSON.stringify(p)).find((p) => p.includes(`"Ref":"${role}ServiceRole`));
+      expect(match, role).toBeDefined();
+      return match!;
+    };
+    for (const name of ["Estimate", "Submit", "Profile"]) {
+      expect(policy(name), name).toMatch(/PublicLogin/);
+      expect(policy(name), name).not.toMatch(/RwLogin/);
+      expect(policy(name), name).toMatch(/rds-data:ExecuteStatement/);
+      // The Data API on this cluster and no other.
+      expect(policy(name), name).toMatch(/"Resource":"arn:aws:rds:us-east-2:111111111111:cluster:lq-db"/);
+    }
+    expect(policy("CompanyApi")).toMatch(/RwLogin/);
+    expect(policy("CompanyApi")).not.toMatch(/PublicLogin|TurnstileSecret|QuoteTokenSecret/);
+    // Only the function that sends lead alerts may send email.
+    expect(policy("Submit")).toMatch(/ses:SendEmail/);
+    expect(policy("Estimate")).not.toMatch(/ses:SendEmail/);
+  });
+
+  it("runs five functions on Node 22, none of them in the VPC", () => {
+    const functions = Object.values(api.findResources("AWS::Lambda::Function")).map((f) => (f as { Properties: Record<string, unknown> }).Properties);
+    expect(functions).toHaveLength(5);
+    for (const f of functions) {
+      expect(f.Runtime).toBe("nodejs22.x");
+      expect(f.VpcConfig).toBeUndefined();
+    }
+  });
+});
+
+describe("configuration", () => {
+  it("refuses an origin with a path, a plain http origin, or a missing value", () => {
+    const config = (over: Record<string, unknown>) => readConfig(new App({ context: { ...context, ...over } }));
+    expect(() => config({ widgetOrigin: "https://w.example.com/w" })).toThrow(/widgetOrigin/);
+    expect(() => config({ dashboardOrigin: "http://app.example.com" })).toThrow(/dashboardOrigin/);
+    expect(() => config({ sesFrom: "" })).toThrow(/sesFrom/);
+    expect(() => config({ sesFrom: "not an address" })).toThrow(/sesFrom/);
+    expect(() => config({ databaseClusterArn: "lq-db" })).toThrow(/databaseClusterArn/);
+  });
+});

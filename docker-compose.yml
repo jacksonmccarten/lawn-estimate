@@ -1,0 +1,16 @@
+# Local Postgres for migrations and the RLS tests. Not used in any deployed environment.
+# docker/initdb creates app_owner, the non-superuser that owns the schema (as on Aurora).
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "54320:5432"
+    volumes:
+      - ./docker/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 2s
+      timeout: 2s
+      retries: 30

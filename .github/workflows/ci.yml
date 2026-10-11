@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 54320:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 2s
+          --health-timeout 2s
+          --health-retries 30
+
+    env:
+      # The non-superuser owner, as in docker-compose.yml and on Aurora.
+      DATABASE_URL: postgres://app_owner:app_owner@localhost:54320/lawnquote
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      # A service container starts before checkout, so it cannot mount the
+      # init script the way docker-compose.yml does; run the same file here.
+      - name: Create app_owner
+        run: psql "postgres://postgres:postgres@localhost:54320/postgres" -v ON_ERROR_STOP=1 -f docker/initdb/01_app_owner.sql
+
+      - run: npm run typecheck
+
+      - name: Apply migrations
+        run: npm run db:migrate
+
+      - run: npm test

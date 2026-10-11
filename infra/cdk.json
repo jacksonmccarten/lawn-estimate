@@ -1,0 +1,11 @@
+{
+  "app": "npx tsx bin/app.ts",
+  "context": {
+    "@aws-cdk/core:defaultCrossStackReferences": "strong",
+    "region": "us-east-2",
+    "databaseClusterArn": "arn:aws:rds:us-east-2:563691829677:cluster:lq-db",
+    "dashboardOrigin": "https://main.d1d6yzngwk2ppf.amplifyapp.com",
+    "widgetOrigin": "https://main.d6ylkt1dbfyd8.amplifyapp.com",
+    "sesFrom": "alerts@not-set.invalid"
+  }
+}

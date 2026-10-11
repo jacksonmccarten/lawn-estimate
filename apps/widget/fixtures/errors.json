@@ -1,0 +1,11 @@
+[
+  { "name": "rate-limited", "httpStatus": 429, "body": { "error": { "code": "rate_limited", "message": "too many requests" } } },
+  { "name": "quota-exceeded", "httpStatus": 429, "body": { "error": { "code": "quota_exceeded", "message": "company quota exhausted" } } },
+  { "name": "turnstile-failed", "httpStatus": 403, "body": { "error": { "code": "turnstile_failed", "message": "turnstile verification failed" } } },
+  { "name": "origin-not-allowed", "httpStatus": 403, "body": { "error": { "code": "origin_not_allowed", "message": "origin is not in the company's allowlist" } } },
+  { "name": "token-invalid", "httpStatus": 400, "body": { "error": { "code": "token_invalid", "message": "quote token is not valid" } } },
+  { "name": "token-expired", "httpStatus": 410, "body": { "error": { "code": "token_expired", "message": "quote token has expired" } } },
+  { "name": "invalid-request", "httpStatus": 400, "body": { "error": { "code": "invalid_request", "message": "request failed validation" } } },
+  { "name": "not-found", "httpStatus": 404, "body": { "error": { "code": "not_found", "message": "no such company" } } },
+  { "name": "internal", "httpStatus": 500, "body": { "error": { "code": "internal", "message": "unexpected error" } } }
+]

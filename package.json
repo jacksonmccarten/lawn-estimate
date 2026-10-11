@@ -1,0 +1,28 @@
+{
+  "name": "instant-lawn-quote",
+  "version": "0.0.0",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "services/*",
+    "infra"
+  ],
+  "scripts": {
+    "db:up": "docker compose up -d --wait",
+    "db:down": "docker compose down",
+    "db:migrate": "npm run migrate -w @lq/db",
+    "db:seed": "npm run seed -w @lq/lambdas",
+    "dev:api": "npm run dev -w @lq/lambdas",
+    "dev:widget": "npm run dev -w @lq/widget",
+    "dev:dashboard": "npm run dev -w @lq/dashboard",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0"
+  }
+}

@@ -1,0 +1,7 @@
+.next/
+next-env.d.ts
+# Built from embed/v1.js by scripts/build-embed.mjs
+public/v1.js
+public/embed/
+test-results/
+playwright-report/

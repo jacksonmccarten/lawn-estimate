@@ -1,0 +1,389 @@
+[
+  {
+    "name": "lancaster-mow",
+    "request": { "company": "joes-lawn", "address": "412 Maple Ave, Lancaster, PA 17601", "service": "mow", "turnstile": "fixture-turnstile-token", "embedOrigin": null },
+    "response": {
+      "status": "priced",
+      "quote": {
+        "lines": [{ "serviceCode": "mow", "name": "Mowing, trimming and edging", "amountCents": 4800, "taxable": true }],
+        "subtotalCents": 4800,
+        "taxableSubtotalCents": 4800,
+        "taxRateBps": 600,
+        "taxCents": 288,
+        "totalCents": 5088
+      },
+      "token": "fx.lancaster-mow",
+      "grassSqft": 8400,
+      "parcelSqft": 14200,
+      "origin": "regrid",
+      "county": "Lancaster",
+      "assumptions": [],
+      "canAdjust": true
+    }
+  },
+  {
+    "name": "lancaster-mow-smaller",
+    "request": { "token": "fx.lancaster-mow", "adjust": "smaller", "turnstile": "fixture-turnstile-token", "embedOrigin": null },
+    "response": {
+      "status": "priced",
+      "quote": {
+        "lines": [{ "serviceCode": "mow", "name": "Mowing, trimming and edging", "amountCents": 4000, "taxable": true }],
+        "subtotalCents": 4000,
+        "taxableSubtotalCents": 4000,
+        "taxRateBps": 600,
+        "taxCents": 240,
+        "totalCents": 4240
+      },
+      "token": "fx.lancaster-mow.smaller",
+      "grassSqft": 6300,
+      "parcelSqft": 14200,
+      "origin": "regrid_adjusted",
+      "county": "Lancaster",
+      "assumptions": [],
+      "canAdjust": false
+    }
+  },
+  {
+    "name": "lancaster-mow-larger",
+    "request": { "token": "fx.lancaster-mow", "adjust": "larger", "turnstile": "fixture-turnstile-token", "embedOrigin": null },
+    "response": {
+      "status": "priced",
+      "quote": {
+        "lines": [{ "serviceCode": "mow", "name": "Mowing, trimming and edging", "amountCents": 5800, "taxable": true }],
+        "subtotalCents": 5800,
+        "taxableSubtotalCents": 5800,
+        "taxRateBps": 600,
+        "taxCents": 348,
+        "totalCents": 6148
+      },
+      "token": "fx.lancaster-mow.larger",
+      "grassSqft": 10500,
+      "parcelSqft": 14200,
+      "origin": "regrid_adjusted",
+      "county": "Lancaster",
+      "assumptions": [],
+      "canAdjust": false
+    }
+  },
+  {
+    "name": "lancaster-leaf",
+    "request": { "company": "joes-lawn", "address": "412 Maple Ave, Lancaster, PA 17601", "service": "leaf_raking", "turnstile": "fixture-turnstile-token", "embedOrigin": null },
+    "response": {
+      "status": "priced",
+      "quote": {
+        "lines": [{ "serviceCode": "leaf_raking", "name": "Leaf raking", "amountCents": 6500, "taxable": false }],
+        "subtotalCents": 6500,
+        "taxableSubtotalCents": 0,
+        "taxRateBps": 600,
+        "taxCents": 0,
+        "totalCents": 6500
+      },
+      "token": "fx.lancaster-leaf",
+      "grassSqft": 8400,
+      "parcelSqft": 14200,
+      "origin": "regrid",
+      "county": "Lancaster",
+      "assumptions": [],
+      "canAdjust": true
+    }
+  },
+  {
+    "name": "lancaster-leaf-smaller",
+    "request": { "token": "fx.lancaster-leaf", "adjust": "smaller", "turnstile": "fixture-turnstile-token", "embedOrigin": null },
+    "response": {
+      "status": "priced",
+      "quote": {
+        "lines": [{ "serviceCode": "leaf_raking", "name": "Leaf raking", "amountCents": 5500, "taxable": false }],
+        "subtotalCents": 5500,
+        "taxableSubtotalCents": 0,
+        "taxRateBps": 600,
+        "taxCents": 0,
+        "totalCents": 5500
+      },
+      "token": "fx.lancaster-leaf.smaller",
+      "grassSqft": 6300,
+      "parcelSqft": 14200,
+      "origin": "regrid_adjusted",
+      "county": "Lancaster",
+      "assumptions": [],
+      "canAdjust": false
+    }
+  },
+  {
+    "name": "lancaster-leaf-larger",
+    "request": { "token": "fx.lancaster-leaf", "adjust": "larger", "turnstile": "fixture-turnstile-token", "embedOrigin": null },
+    "response": {
+      "status": "priced",
+      "quote": {
+        "lines": [{ "serviceCode": "leaf_raking", "name": "Leaf raking", "amountCents": 7800, "taxable": false }],
+        "subtotalCents": 7800,
+        "taxableSubtotalCents": 0,
+        "taxRateBps": 600,
+        "taxCents": 0,
+        "totalCents": 7800
+      },
+      "token": "fx.lancaster-leaf.larger",
+      "grassSqft": 10500,
+      "parcelSqft": 14200,
+      "origin": "regrid_adjusted",
+      "county": "Lancaster",
+      "assumptions": [],
+      "canAdjust": false
+    }
+  },
+  {
+    "name": "pittsburgh-mow",
+    "request": { "company": "joes-lawn", "address": "88 Ridge Rd, Pittsburgh, PA 15237", "service": "mow", "turnstile": "fixture-turnstile-token", "embedOrigin": null },
+    "response": {
+      "status": "priced",
+      "quote": {
+        "lines": [{ "serviceCode": "mow", "name": "Mowing, trimming and edging", "amountCents": 5200, "taxable": true }],
+        "subtotalCents": 5200,
+        "taxableSubtotalCents": 5200,
+        "taxRateBps": 700,
+        "taxCents": 364,
+        "totalCents": 5564
+      },
+      "token": "fx.pittsburgh-mow",
+      "grassSqft": 9100,
+      "parcelSqft": 13000,
+      "origin": "regrid",
+      "county": "Allegheny",
+      "assumptions": ["includes the house footprint"],
+      "canAdjust": true
+    }
+  },
+  {
+    "name": "pittsburgh-mow-smaller",
+    "request": { "token": "fx.pittsburgh-mow", "adjust": "smaller", "turnstile": "fixture-turnstile-token", "embedOrigin": null },
+    "response": {
+      "status": "priced",
+      "quote": {
+        "lines": [{ "serviceCode": "mow", "name": "Mowing, trimming and edging", "amountCents": 4200, "taxable": true }],
+        "subtotalCents": 4200,
+        "taxableSubtotalCents": 4200,
+        "taxRateBps": 700,
+        "taxCents": 294,
+        "totalCents": 4494
+      },
+      "token": "fx.pittsburgh-mow.smaller",
+      "grassSqft": 6800,
+      "parcelSqft": 13000,
+      "origin": "regrid_adjusted",
+      "county": "Allegheny",
+      "assumptions": ["includes the house footprint"],
+      "canAdjust": false
+    }
+  },
+  {
+    "name": "pittsburgh-mow-larger",
+    "request": { "token": "fx.pittsburgh-mow", "adjust": "larger", "turnstile": "fixture-turnstile-token", "embedOrigin": null },
+    "response": {
+      "status": "priced",
+      "quote": {
+        "lines": [{ "serviceCode": "mow", "name": "Mowing, trimming and edging", "amountCents": 6200, "taxable": true }],
+        "subtotalCents": 6200,
+        "taxableSubtotalCents": 6200,
+        "taxRateBps": 700,
+        "taxCents": 434,
+        "totalCents": 6634
+      },
+      "token": "fx.pittsburgh-mow.larger",
+      "grassSqft": 11400,
+      "parcelSqft": 13000,
+      "origin": "regrid_adjusted",
+      "county": "Allegheny",
+      "assumptions": ["includes the house footprint"],
+      "canAdjust": false
+    }
+  },
+  {
+    "name": "kutztown-over-two-acres",
+    "request": { "company": "joes-lawn", "address": "1 Farm Ln, Kutztown, PA 19530", "service": "mow", "turnstile": "fixture-turnstile-token", "embedOrigin": null },
+    "response": { "status": "manual_required", "reason": "parcel_over_two_acres" }
+  },
+  {
+    "name": "philadelphia-ambiguous",
+    "request": { "company": "joes-lawn", "address": "7 Ridge Ave, Philadelphia, PA 19128", "service": "mow", "turnstile": "fixture-turnstile-token", "embedOrigin": null },
+    "response": { "status": "manual_required", "reason": "ambiguous_match" }
+  },
+  {
+    "name": "no-match",
+    "request": { "company": "joes-lawn", "address": "23 Nowhere St, Lancaster, PA 17601", "service": "mow", "turnstile": "fixture-turnstile-token", "embedOrigin": null },
+    "response": { "status": "manual_required", "reason": "no_match" }
+  },
+  {
+    "name": "outside-service-area",
+    "request": { "company": "joes-lawn", "address": "500 Market St, Wilmington, DE 19801", "service": "mow", "turnstile": "fixture-turnstile-token", "embedOrigin": null },
+    "response": { "status": "call_us", "reason": "outside_service_area", "phone": "(717) 555-0142" }
+  },
+  {
+    "name": "drawn-17601",
+    "request": {
+      "company": "joes-lawn",
+      "address": "412 Maple Ave, Lancaster, PA 17601",
+      "service": "mow",
+      "manual": { "zip": "17601", "size": { "kind": "drawn", "sqft": 3950 } },
+      "turnstile": "fixture-turnstile-token",
+      "embedOrigin": null
+    },
+    "response": {
+      "status": "priced",
+      "quote": {
+        "lines": [{ "serviceCode": "mow", "name": "Mowing, trimming and edging", "amountCents": 4500, "taxable": true }],
+        "subtotalCents": 4500,
+        "taxableSubtotalCents": 4500,
+        "taxRateBps": 600,
+        "taxCents": 270,
+        "totalCents": 4770
+      },
+      "token": "fx.drawn-17601",
+      "grassSqft": 4000,
+      "parcelSqft": null,
+      "origin": "drawn",
+      "county": "Lancaster",
+      "assumptions": ["Measured on an aerial photo, not a survey."],
+      "canAdjust": false
+    }
+  },
+  {
+    "name": "manual-17601",
+    "request": {
+      "company": "joes-lawn",
+      "address": "23 Nowhere St, Lancaster, PA 17601",
+      "service": "mow",
+      "manual": { "zip": "17601", "size": { "kind": "bucket", "bucket": "quarter_acre" } },
+      "turnstile": "fixture-turnstile-token",
+      "embedOrigin": null
+    },
+    "response": {
+      "status": "priced",
+      "quote": {
+        "lines": [{ "serviceCode": "mow", "name": "Mowing, trimming and edging", "amountCents": 4500, "taxable": true }],
+        "subtotalCents": 4500,
+        "taxableSubtotalCents": 4500,
+        "taxRateBps": 600,
+        "taxCents": 270,
+        "totalCents": 4770
+      },
+      "token": "fx.manual-17601",
+      "grassSqft": 7600,
+      "parcelSqft": null,
+      "origin": "bucket",
+      "county": "Lancaster",
+      "assumptions": [],
+      "canAdjust": false
+    }
+  },
+  {
+    "name": "manual-19530",
+    "request": {
+      "company": "joes-lawn",
+      "address": "1 Farm Ln, Kutztown, PA 19530",
+      "service": "mow",
+      "manual": { "zip": "19530", "size": { "kind": "bucket", "bucket": "half_acre" } },
+      "turnstile": "fixture-turnstile-token",
+      "embedOrigin": null
+    },
+    "response": {
+      "status": "priced",
+      "quote": {
+        "lines": [{ "serviceCode": "mow", "name": "Mowing, trimming and edging", "amountCents": 7200, "taxable": true }],
+        "subtotalCents": 7200,
+        "taxableSubtotalCents": 7200,
+        "taxRateBps": 600,
+        "taxCents": 432,
+        "totalCents": 7632
+      },
+      "token": "fx.manual-19530",
+      "grassSqft": 15200,
+      "parcelSqft": null,
+      "origin": "bucket",
+      "county": "Berks",
+      "assumptions": [],
+      "canAdjust": false
+    }
+  },
+  {
+    "name": "manual-19128-county-required",
+    "request": {
+      "company": "joes-lawn",
+      "address": "7 Ridge Ave, Philadelphia, PA 19128",
+      "service": "mow",
+      "manual": { "zip": "19128", "size": { "kind": "bucket", "bucket": "quarter_acre" } },
+      "turnstile": "fixture-turnstile-token",
+      "embedOrigin": null
+    },
+    "response": { "status": "county_required", "zip": "19128", "candidates": ["Philadelphia", "Montgomery"] }
+  },
+  {
+    "name": "manual-19128-philadelphia",
+    "request": {
+      "company": "joes-lawn",
+      "address": "7 Ridge Ave, Philadelphia, PA 19128",
+      "service": "mow",
+      "manual": { "zip": "19128", "size": { "kind": "bucket", "bucket": "quarter_acre" }, "county": "Philadelphia" },
+      "turnstile": "fixture-turnstile-token",
+      "embedOrigin": null
+    },
+    "response": {
+      "status": "priced",
+      "quote": {
+        "lines": [{ "serviceCode": "mow", "name": "Mowing, trimming and edging", "amountCents": 4500, "taxable": true }],
+        "subtotalCents": 4500,
+        "taxableSubtotalCents": 4500,
+        "taxRateBps": 800,
+        "taxCents": 360,
+        "totalCents": 4860
+      },
+      "token": "fx.manual-19128-philadelphia",
+      "grassSqft": 7600,
+      "parcelSqft": null,
+      "origin": "bucket",
+      "county": "Philadelphia",
+      "assumptions": [],
+      "canAdjust": false
+    }
+  },
+  {
+    "name": "manual-19128-montgomery",
+    "request": {
+      "company": "joes-lawn",
+      "address": "7 Ridge Ave, Philadelphia, PA 19128",
+      "service": "mow",
+      "manual": { "zip": "19128", "size": { "kind": "bucket", "bucket": "quarter_acre" }, "county": "Montgomery" },
+      "turnstile": "fixture-turnstile-token",
+      "embedOrigin": null
+    },
+    "response": {
+      "status": "priced",
+      "quote": {
+        "lines": [{ "serviceCode": "mow", "name": "Mowing, trimming and edging", "amountCents": 4500, "taxable": true }],
+        "subtotalCents": 4500,
+        "taxableSubtotalCents": 4500,
+        "taxRateBps": 600,
+        "taxCents": 270,
+        "totalCents": 4770
+      },
+      "token": "fx.manual-19128-montgomery",
+      "grassSqft": 7600,
+      "parcelSqft": null,
+      "origin": "bucket",
+      "county": "Montgomery",
+      "assumptions": [],
+      "canAdjust": false
+    }
+  },
+  {
+    "name": "manual-unknown-zip",
+    "request": {
+      "company": "joes-lawn",
+      "address": "23 Nowhere St, Lancaster, PA 17601",
+      "service": "mow",
+      "manual": { "zip": "17000", "size": { "kind": "sqft", "sqft": 6000 } },
+      "turnstile": "fixture-turnstile-token",
+      "embedOrigin": null
+    },
+    "response": { "status": "call_us", "reason": "unknown_county", "phone": "(717) 555-0142" }
+  }
+]

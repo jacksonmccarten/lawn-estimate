@@ -1,0 +1,27 @@
+[
+  {
+    "slug": "joes-lawn",
+    "name": "Joe's Lawn Care",
+    "theme": { "color": "#1f6f43" },
+    "services": [
+      { "code": "leaf_raking", "name": "Leaf raking", "season": "growing" },
+      { "code": "mow", "name": "Mowing, trimming and edging", "season": "growing" }
+    ],
+    "regions": [
+      { "kind": "county", "value": "Allegheny" },
+      { "kind": "county", "value": "Berks" },
+      { "kind": "county", "value": "Lancaster" },
+      { "kind": "county", "value": "Montgomery" },
+      { "kind": "county", "value": "Philadelphia" }
+    ],
+    "allowedOrigins": ["https://joeslawn.example", "http://host.localhost:3102"]
+  },
+  {
+    "slug": "sunny-yards",
+    "name": "Sunny Yards",
+    "theme": { "color": "#ffd200" },
+    "services": [{ "code": "mow", "name": "Mowing, trimming and edging", "season": "growing" }],
+    "regions": [{ "kind": "county", "value": "Lancaster" }],
+    "allowedOrigins": []
+  }
+]

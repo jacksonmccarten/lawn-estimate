@@ -1,0 +1,12 @@
+[
+  {
+    "name": "submitted",
+    "request": {
+      "token": "fx.lancaster-mow",
+      "contact": { "name": "Pat Example", "phone": "717-555-0100" },
+      "turnstile": "fixture-turnstile-token",
+      "embedOrigin": null
+    },
+    "response": { "status": "submitted", "quoteId": "3f2b8c1e-5d47-4a9b-9c66-0d1e2f3a4b5c" }
+  }
+]

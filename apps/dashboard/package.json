@@ -1,0 +1,39 @@
+{
+  "name": "@lq/dashboard",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev --webpack -p 3000",
+    "build": "next build --webpack",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "next typegen && tsc -p tsconfig.json",
+    "test": "vitest run",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@lq/api-contract": "*",
+    "@lq/pricing": "*",
+    "amazon-cognito-identity-js": "^6.3.20",
+    "next": "^16.4.0",
+    "qrcode-generator": "^2.0.4",
+    "react": "^19.3.0",
+    "react-aria-components": "^1.22.1",
+    "react-dom": "^19.3.0",
+    "zod": "^4.6.0"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@playwright/test": "^1.64.0",
+    "@types/node": "^20.19.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "eslint": "^9.39.0",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
+    "eslint-plugin-react-hooks": "^7.0.0",
+    "jsqr": "^1.4.0",
+    "typescript-eslint": "^8.71.1",
+    "vitest": "^3.2.0"
+  }
+}
