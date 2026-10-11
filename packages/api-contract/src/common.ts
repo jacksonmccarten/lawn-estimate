@@ -74,6 +74,8 @@ export const ErrorCode = z.enum([
   "lead_already_decided",
   /** AWS Monetization is not configured, or did not answer. */
   "billing_unavailable",
+  /** No inbox is configured for the website's contact form. */
+  "contact_unavailable",
   "internal",
 ]);
 export type ErrorCode = z.infer<typeof ErrorCode>;

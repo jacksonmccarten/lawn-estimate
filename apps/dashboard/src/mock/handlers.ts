@@ -75,7 +75,7 @@ const summary = ({ content: _content, ...rest }: PricingVersion) => rest;
 
 type Handler = (ctx: { store: Store; id: string; query: URLSearchParams; body: unknown; sub: string }) => { schema: z.ZodType; value: unknown };
 
-const handlers: Record<Exclude<keyof typeof routes, "estimate" | "submit" | "getProfile">, Handler> = {
+const handlers: Record<Exclude<keyof typeof routes, "estimate" | "submit" | "getProfile" | "sendContact">, Handler> = {
   getCompany: ({ store }) => ({ schema: routes.getCompany.response, value: store.company }),
 
   updateCompany: ({ store, body }) => {

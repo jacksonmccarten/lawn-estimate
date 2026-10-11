@@ -16,6 +16,7 @@ import { createCompanyApi } from "../src/company/api.js";
 import type { HttpEvent, HttpResult } from "../src/http.js";
 import { log } from "../src/log.js";
 import type { PublicDeps } from "../src/public/deps.js";
+import { createContactHandler } from "../src/public/contact.js";
 import { createEstimateHandler } from "../src/public/estimate.js";
 import { createNotifier } from "../src/public/notify.js";
 import { createProfileHandler } from "../src/public/profile.js";
@@ -66,12 +67,14 @@ const publicDeps: PublicDeps = {
 const estimate = createEstimateHandler(publicDeps);
 const submit = createSubmitHandler(publicDeps);
 const profile = createProfileHandler({ withPublic });
+// No SES locally: the contact form answers contact_unavailable, as it does in an environment with no inbox.
+const contact = createContactHandler({ turnstile: publicDeps.turnstile, inbox: null, siteOrigin: null, log });
 const companyApi = createCompanyApi({ withCompany, signUp: createWithSignup(rw), billing, dashboardOrigin: env.dashboardOrigin });
 
 type Handler = (event: HttpEvent) => Promise<HttpResult>;
 type Match = { handler: Handler; routeKey: string; params: Record<string, string>; owner: boolean };
 
-const publicHandlers: Record<string, Handler> = { "/estimate": estimate, "/submit": submit, "/profile/{company}": profile };
+const publicHandlers: Record<string, Handler> = { "/estimate": estimate, "/submit": submit, "/profile/{company}": profile, "/contact": contact };
 
 /** The contract's routes are the routing table, as they are for API Gateway. */
 function match(method: string, path: string): Match | null {

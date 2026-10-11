@@ -19,6 +19,7 @@ export * from "./company.js";
 export const routes = {
   estimate: { method: "POST", path: "/estimate", auth: "public", request: pub.EstimateRequest, response: pub.EstimateResponse },
   submit: { method: "POST", path: "/submit", auth: "public", request: pub.SubmitRequest, response: pub.SubmitResponse },
+  sendContact: { method: "POST", path: "/contact", auth: "public", request: pub.ContactRequest, response: pub.ContactResponse, errors: { 503: "contact_unavailable" } },
   getProfile: { method: "GET", path: "/profile/{company}", auth: "public", response: pub.PublicProfile },
 
   getCompany: { method: "GET", path: "/company", auth: "owner", response: company.Company },

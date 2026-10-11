@@ -146,6 +146,25 @@ export const SubmitResponse = z.strictObject({
 });
 export type SubmitResponse = z.infer<typeof SubmitResponse>;
 
+// ---- POST /contact
+
+/**
+ * The public website's contact form, from the dashboard's own origin. The
+ * message is emailed to the InstaQuoter AI team; nothing is stored.
+ */
+export const ContactRequest = z.strictObject({
+  name: z.string().trim().min(1).max(120),
+  email: z.email().max(254),
+  message: z.string().trim().min(1).max(4000),
+  turnstile: Turnstile,
+  /** Honeypot: hidden from people, so anything in it marks a bot. */
+  website: z.string().max(0).optional(),
+});
+export type ContactRequest = z.infer<typeof ContactRequest>;
+
+export const ContactResponse = z.strictObject({ status: z.literal("sent") });
+export type ContactResponse = z.infer<typeof ContactResponse>;
+
 // ---- GET /profile/{company}
 
 /**
