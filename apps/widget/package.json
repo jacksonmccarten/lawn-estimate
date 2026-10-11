@@ -16,6 +16,7 @@
   "dependencies": {
     "@lq/api-contract": "*",
     "next": "^16.4.0",
+    "polygon-clipping": "^0.15.7",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
   },
