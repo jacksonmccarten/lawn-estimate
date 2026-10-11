@@ -11,7 +11,7 @@ import { AuthError } from "@/lib/auth/types";
 
 /** Only a path on this site: `next` comes from the URL. */
 function safeNext(next: string | null): string {
-  return next && /^\/(?!\/)/.test(next) && !next.startsWith("/sign-in") ? next : "/leads";
+  return next && /^\/(?!\/)/.test(next) && !next.startsWith("/sign-in") && !next.startsWith("/login") ? next : "/leads";
 }
 
 function SignIn() {
