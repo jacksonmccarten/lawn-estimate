@@ -5,7 +5,7 @@
 
 import { expect, expectAccessible, signIn, test } from "./support";
 
-test("the owner creates a service area from a name and a centre address, and it is in Pricing at once", async ({ page }) => {
+test("the owner creates a service area from a name and a centre address, and it is saved", async ({ page }) => {
   await signIn(page);
   await page.getByRole("link", { name: "Service area" }).click();
   await expect(page).toHaveURL(/\/settings\/area$/);
@@ -45,13 +45,6 @@ test("the owner creates a service area from a name and a centre address, and it 
   await expect(page.getByLabel("Area name")).toHaveValue("");
   await expectAccessible(page);
 
-  // In Pricing, a new draft's tier can be given the new region group.
-  await page.getByRole("link", { name: "Pricing" }).first().click();
-  await page.getByRole("button", { name: /^New draft from version/ }).click();
-  await expect(page).toHaveURL(/\/pricing\/[0-9a-f-]+$/);
-  await page.getByRole("button", { name: "Add tier" }).click();
-  await page.getByRole("button", { name: /Tier \d+, region group/ }).last().click();
-  await expect(page.getByRole("option", { name: "east-side", exact: true })).toBeVisible();
 });
 
 test("a service area is removed from a list, and the change is saved", async ({ page }) => {

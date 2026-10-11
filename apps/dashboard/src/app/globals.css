@@ -639,10 +639,6 @@ a.link {
 .error-summary .table thead th {
   background: transparent;
 }
-.csv-status {
-  min-height: 1.5rem;
-}
-
 .toasts {
   position: fixed;
   right: 1rem;
@@ -787,16 +783,6 @@ a.link {
   border: 1px solid var(--control-border);
 }
 
-.preview-form {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
-  gap: 0 1rem;
-  align-items: start;
-}
-.preview-form .checkbox-group,
-.preview-form .form-actions {
-  grid-column: 1 / -1;
-}
 .save-bar .form-actions {
   margin-top: 0;
 }

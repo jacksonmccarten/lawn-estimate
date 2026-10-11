@@ -1,252 +1,90 @@
 "use client";
 
-import type { PricingVersion, PricingVersionContent, Tier } from "@lq/api-contract";
+// A draft's prices: lawn-size categories, each with one flat rate. The
+// homeowner's lawn area picks the category; the price is its rate, never
+// square feet times a rate.
+
+import type { PricingVersion } from "@lq/api-contract";
 import { memo, useCallback, useEffect, useMemo, useReducer, useRef, useState, type Dispatch } from "react";
 import { Button } from "react-aria-components";
 import { ApiError, describeError } from "@/lib/api";
-import { fieldId, fromForm, newKey, sameForm, tierToRow, toForm, type FieldError, type PricingForm, type ServiceRow, type TierRow } from "@/lib/pricing-form";
+import { fieldId, fromForm, newKey, rangeLabel, sameForm, toForm, type CategoryRow, type FieldError, type PricingForm } from "@/lib/pricing-form";
+import { parseWholeNumber } from "@/lib/money";
 import { DRAFT_KEY_PREFIX, useApi } from "../auth-provider";
-import { BusyButton, errorFor, ErrorSummary, SelectField, TableScroll, TextInput, useToast } from "../ui";
-import { CsvImport } from "./csv-import";
-import { PreviewQuote } from "./preview";
+import { BusyButton, ErrorSummary, TableScroll, TextInput, useToast } from "../ui";
 import { PublishDialog } from "./publish-dialog";
 
 type Action =
   | { type: "load"; form: PricingForm }
-  | { type: "set"; field: "minCharge"; value: string }
-  | { type: "service/add"; key: string }
-  | { type: "service/remove"; key: string }
-  | { type: "service/update"; key: string; patch: Partial<ServiceRow> }
-  | { type: "tier/add"; key: string; regionGroup: string }
-  | { type: "tier/remove"; key: string }
-  | { type: "tier/update"; key: string; patch: Partial<TierRow> }
-  | { type: "tier/move"; key: string; by: -1 | 1 }
-  | { type: "tiers/import"; rows: TierRow[]; mode: "replace" | "append" };
+  | { type: "add"; key: string }
+  | { type: "remove"; key: string }
+  | { type: "update"; key: string; patch: Partial<CategoryRow> };
 
 function reducer(form: PricingForm, action: Action): PricingForm {
   switch (action.type) {
     case "load":
       return action.form;
-    case "set":
-      return { ...form, [action.field]: action.value };
-    case "service/add":
-      return { ...form, services: [...form.services, { key: action.key, code: "", name: "", taxable: "", season: "growing" }] };
-    case "service/remove":
-      return { ...form, services: form.services.filter((s) => s.key !== action.key) };
-    case "service/update": {
-      const before = form.services.find((s) => s.key === action.key);
-      const services = form.services.map((s) => (s.key === action.key ? { ...s, ...action.patch } : s));
-      // Renaming a service's code carries its tiers along, unless another service shares the old code.
-      const renamed = before && action.patch.code !== undefined && before.code !== "" && form.services.filter((s) => s.code === before.code).length === 1;
-      const tiers = renamed ? form.tiers.map((t) => (t.serviceCode === before.code ? { ...t, serviceCode: action.patch.code! } : t)) : form.tiers;
-      return { ...form, services, tiers };
+    case "add": {
+      // A new category goes above the open-ended last one, starting where the one before it ends.
+      const rows = form.categories;
+      const beforeLast = rows.length >= 2 ? parseWholeNumber(rows[rows.length - 2]!.upTo) : 0;
+      const row: CategoryRow = { key: action.key, upTo: beforeLast !== null ? String(beforeLast + 2_500) : "", price: "" };
+      return { categories: rows.length === 0 ? [row] : [...rows.slice(0, -1), row, rows[rows.length - 1]!] };
     }
-    case "tier/add": {
-      const last = form.tiers[form.tiers.length - 1];
-      // Start the next tier where the last one stopped, for the same service and region.
-      const row: TierRow = {
-        key: action.key,
-        serviceCode: last?.serviceCode ?? form.services[0]?.code ?? "",
-        regionGroup: last?.regionGroup ?? action.regionGroup,
-        minSqft: last?.maxSqft ?? "0",
-        maxSqft: "",
-        priceKind: last?.priceKind ?? "per_sqft",
-        price: "",
-      };
-      return { ...form, tiers: [...form.tiers, row] };
-    }
-    case "tier/remove":
-      return { ...form, tiers: form.tiers.filter((t) => t.key !== action.key) };
-    case "tier/update":
-      return { ...form, tiers: form.tiers.map((t) => (t.key === action.key ? { ...t, ...action.patch } : t)) };
-    case "tier/move": {
-      const from = form.tiers.findIndex((t) => t.key === action.key);
-      const to = from + action.by;
-      if (from < 0 || to < 0 || to >= form.tiers.length) return form;
-      const tiers = [...form.tiers];
-      [tiers[from], tiers[to]] = [tiers[to]!, tiers[from]!];
-      return { ...form, tiers };
-    }
-    case "tiers/import":
-      return { ...form, tiers: action.mode === "replace" ? action.rows : [...form.tiers, ...action.rows] };
+    case "remove":
+      return { categories: form.categories.filter((c) => c.key !== action.key) };
+    case "update":
+      return { categories: form.categories.map((c) => (c.key === action.key ? { ...c, ...action.patch } : c)) };
   }
 }
 
-const TAX_OPTIONS = [
-  { id: "yes", label: "Taxable" },
-  { id: "no", label: "Not taxable" },
-];
-const SEASON_OPTIONS = [
-  { id: "growing", label: "Growing season" },
-  { id: "winter", label: "Winter" },
-];
-const PRICE_KIND_OPTIONS = [
-  { id: "per_sqft", label: "Per 1,000 sq ft" },
-  { id: "flat", label: "Flat price" },
-];
-
 type RowErrors = Record<string, string | undefined>;
+const NO_ERRORS: RowErrors = {};
 
-const ServiceRowEditor = memo(function ServiceRowEditor({
+const CategoryRowEditor = memo(function CategoryRowEditor({
   row,
   index,
+  from,
+  last,
   errors,
   dispatch,
   onRemove,
 }: {
-  row: ServiceRow;
+  row: CategoryRow;
   index: number;
+  /** Where this category starts: the end of the one above, or 0. */
+  from: number;
+  last: boolean;
   errors: RowErrors;
   dispatch: Dispatch<Action>;
   onRemove: (key: string, label: string) => void;
 }) {
   const n = index + 1;
-  const update = (patch: Partial<ServiceRow>) => dispatch({ type: "service/update", key: row.key, patch });
+  const update = (patch: Partial<CategoryRow>) => dispatch({ type: "update", key: row.key, patch });
+  const upTo = parseWholeNumber(row.upTo);
   return (
     <tr>
-      <th scope="row">{n}</th>
+      <th scope="row">{rangeLabel(from, last ? null : upTo !== null && upTo > from ? upTo : null)}</th>
       <td>
-        <TextInput id={fieldId.service(row.key, "name")} label={`Service ${n}, name`} hideLabel value={row.name} onChange={(name) => update({ name })} error={errors.name} />
-      </td>
-      <td>
-        <TextInput
-          id={fieldId.service(row.key, "code")}
-          label={`Service ${n}, code`}
-          hideLabel
-          value={row.code}
-          onChange={(code) => update({ code })}
-          error={errors.code}
-          className="code"
-        />
-      </td>
-      <td>
-        <SelectField
-          id={fieldId.service(row.key, "taxable")}
-          label={`Service ${n}, sales tax`}
-          hideLabel
-          value={row.taxable}
-          onChange={(taxable) => update({ taxable: taxable as ServiceRow["taxable"] })}
-          options={TAX_OPTIONS}
-          error={errors.taxable}
-        />
-      </td>
-      <td>
-        <SelectField
-          id={fieldId.service(row.key, "season")}
-          label={`Service ${n}, season`}
-          hideLabel
-          value={row.season}
-          onChange={(season) => update({ season: season as ServiceRow["season"] })}
-          options={SEASON_OPTIONS}
-        />
-      </td>
-      <td>
-        <Button className="btn quiet" onPress={() => onRemove(row.key, `Service ${n}`)} aria-label={`Remove service ${n}${row.name ? `, ${row.name}` : ""}`}>
-          Remove
-        </Button>
-      </td>
-    </tr>
-  );
-});
-
-const TierRowEditor = memo(function TierRowEditor({
-  row,
-  index,
-  errors,
-  services,
-  regionGroups,
-  dispatch,
-  onRemove,
-  onMove,
-}: {
-  row: TierRow;
-  index: number;
-  errors: RowErrors;
-  services: ReadonlyArray<{ id: string; label: string }>;
-  /** The company's region groups. Empty while they load, or if it has none: the group is then typed. */
-  regionGroups: ReadonlyArray<{ id: string; label: string }>;
-  dispatch: Dispatch<Action>;
-  onRemove: (key: string, label: string) => void;
-  onMove: (key: string, index: number, by: -1 | 1) => void;
-}) {
-  const n = index + 1;
-  const update = (patch: Partial<TierRow>) => dispatch({ type: "tier/update", key: row.key, patch });
-  return (
-    <tr>
-      <th scope="row">{n}</th>
-      <td>
-        <SelectField
-          id={fieldId.tier(row.key, "service")}
-          label={`Tier ${n}, service`}
-          hideLabel
-          value={row.serviceCode}
-          onChange={(serviceCode) => update({ serviceCode })}
-          options={services}
-          error={errors.service}
-        />
-      </td>
-      <td>
-        {regionGroups.length > 0 ? (
-          <SelectField
-            id={fieldId.tier(row.key, "region")}
-            label={`Tier ${n}, region group`}
-            hideLabel
-            value={row.regionGroup}
-            onChange={(regionGroup) => update({ regionGroup })}
-            // A group this tier already names stays choosable, even if no region uses it now.
-            options={row.regionGroup && !regionGroups.some((g) => g.id === row.regionGroup) ? [...regionGroups, { id: row.regionGroup, label: `${row.regionGroup} (no region uses it)` }] : regionGroups}
-            error={errors.region}
-          />
+        {last ? (
+          <span className="muted">and up</span>
         ) : (
           <TextInput
-            id={fieldId.tier(row.key, "region")}
-            label={`Tier ${n}, region group`}
+            id={fieldId.category(row.key, "max")}
+            label={`Category ${n}, up to and including, in square feet`}
             hideLabel
-            value={row.regionGroup}
-            onChange={(regionGroup) => update({ regionGroup })}
-            error={errors.region}
-            className="short"
+            inputMode="numeric"
+            value={row.upTo}
+            onChange={(value) => update({ upTo: value })}
+            error={errors.max}
+            className="short num"
           />
         )}
       </td>
       <td>
         <TextInput
-          id={fieldId.tier(row.key, "min")}
-          label={`Tier ${n}, lawn area over, in square feet`}
-          hideLabel
-          inputMode="numeric"
-          value={row.minSqft}
-          onChange={(minSqft) => update({ minSqft })}
-          error={errors.min}
-          className="short num"
-        />
-      </td>
-      <td>
-        <TextInput
-          id={fieldId.tier(row.key, "max")}
-          label={`Tier ${n}, lawn area up to and including, in square feet`}
-          hideLabel
-          inputMode="numeric"
-          value={row.maxSqft}
-          onChange={(maxSqft) => update({ maxSqft })}
-          error={errors.max}
-          className="short num"
-        />
-      </td>
-      <td>
-        <SelectField
-          id={fieldId.tier(row.key, "kind")}
-          label={`Tier ${n}, how it is priced`}
-          hideLabel
-          value={row.priceKind}
-          onChange={(priceKind) => update({ priceKind: priceKind as TierRow["priceKind"] })}
-          options={PRICE_KIND_OPTIONS}
-        />
-      </td>
-      <td>
-        <TextInput
-          id={fieldId.tier(row.key, "price")}
-          label={row.priceKind === "per_sqft" ? `Tier ${n}, price in dollars per 1,000 square feet` : `Tier ${n}, flat price in dollars`}
+          id={fieldId.category(row.key, "price")}
+          label={`Category ${n}, flat rate in dollars`}
           hideLabel
           inputMode="decimal"
           value={row.price}
@@ -256,38 +94,27 @@ const TierRowEditor = memo(function TierRowEditor({
         />
       </td>
       <td>
-        {/* Reordering by buttons, not dragging (2.5.7). They stay enabled so focus is never dropped at either end. */}
-        <div className="row-actions">
-          <Button className="btn quiet" aria-label={`Move tier ${n} up`} onPress={() => onMove(row.key, index, -1)}>
-            <span aria-hidden="true">↑</span>
-          </Button>
-          <Button className="btn quiet" aria-label={`Move tier ${n} down`} onPress={() => onMove(row.key, index, 1)}>
-            <span aria-hidden="true">↓</span>
-          </Button>
-          <Button className="btn quiet" onPress={() => onRemove(row.key, `Tier ${n}`)} aria-label={`Remove tier ${n}`}>
-            Remove
-          </Button>
-        </div>
+        <Button className="btn quiet" onPress={() => onRemove(row.key, `Category ${n}`)} aria-label={`Remove category ${n}`}>
+          Remove
+        </Button>
       </td>
     </tr>
   );
 });
 
-const NO_ERRORS: RowErrors = {};
-
 /** Groups field errors by row key, with stable objects so unchanged rows do not re-render. */
-function useRowErrors(errors: FieldError[], prefix: "service" | "tier"): Map<string, RowErrors> {
+function useRowErrors(errors: FieldError[]): Map<string, RowErrors> {
   return useMemo(() => {
     const byRow = new Map<string, RowErrors>();
     for (const error of errors) {
-      const match = new RegExp(`^${prefix}-(.+)-([a-z]+)$`).exec(error.fieldId);
+      const match = /^category-(.+)-([a-z]+)$/.exec(error.fieldId);
       if (!match) continue;
       const row = byRow.get(match[1]!) ?? {};
       row[match[2]!] ??= error.message;
       byRow.set(match[1]!, row);
     }
     return byRow;
-  }, [errors, prefix]);
+  }, [errors]);
 }
 
 function readWorkingCopy(id: string, baseline: PricingForm): PricingForm | null {
@@ -295,15 +122,9 @@ function readWorkingCopy(id: string, baseline: PricingForm): PricingForm | null 
     const raw = sessionStorage.getItem(DRAFT_KEY_PREFIX + id);
     if (!raw) return null;
     const stored = JSON.parse(raw) as PricingForm;
-    if (!Array.isArray(stored.services) || !Array.isArray(stored.tiers)) return null;
+    if (!Array.isArray(stored.categories)) return null;
     // Row keys are only unique within a page load.
-    // The coverage factor is not edited: it is whatever the version holds, whatever an older working copy says.
-    const form = {
-      minCharge: stored.minCharge,
-      coverageFactor: baseline.coverageFactor,
-      services: stored.services.map((s) => ({ ...s, key: newKey() })),
-      tiers: stored.tiers.map((t) => ({ ...t, key: newKey() })),
-    };
+    const form = { categories: stored.categories.map((c) => ({ upTo: String(c.upTo ?? ""), price: String(c.price ?? ""), key: newKey() })) };
     return sameForm(form, baseline) ? null : form;
   } catch {
     return null;
@@ -338,28 +159,26 @@ export function PricingEditor({ version, onSaved, onPublished, reviewOnOpen }: P
   const summaryRef = useRef<HTMLDivElement>(null);
   const focusSummary = useRef(false);
   const focusField = useRef<string | null>(null);
-  const addServiceRef = useRef<HTMLButtonElement>(null);
-  const addTierRef = useRef<HTMLButtonElement>(null);
+  const addRef = useRef<HTMLButtonElement>(null);
 
-  // The region groups the company's service area is divided into; a tier's prices apply in one of them.
-  const [regionGroups, setRegionGroups] = useState<ReadonlyArray<{ id: string; label: string }>>([]);
+  // The region groups of the company's service area: the same flat rates are written for each.
+  const [regionGroups, setRegionGroups] = useState<string[] | null>(null);
   useEffect(() => {
     let cancelled = false;
     api.getRegions().then(
-      ({ regions }) => {
-        if (cancelled) return;
-        const groups = [...new Set(regions.map((r) => r.tierGroup))].sort();
-        setRegionGroups(groups.map((g) => ({ id: g, label: g })));
-      },
-      // Without them the group is typed, as before.
-      () => {},
+      ({ regions }) => !cancelled && setRegionGroups([...new Set(regions.map((r) => r.tierGroup))]),
+      // Without them, the groups the version already prices.
+      () => !cancelled && setRegionGroups([...new Set(version.content.tiers.map((t) => t.regionGroup))]),
     );
     return () => {
       cancelled = true;
     };
-  }, [api]);
+  }, [api, version.content.tiers]);
 
   const dirty = useMemo(() => !sameForm(form, baseline), [form, baseline]);
+  // A version from before flat rates (or a new one showing the example categories) needs saving even when nothing was typed.
+  const parsed = useMemo(() => (regionGroups ? fromForm(form, version.content, regionGroups) : null), [form, version.content, regionGroups]);
+  const unsaved = dirty || (parsed?.ok === true && JSON.stringify(parsed.content) !== JSON.stringify(version.content));
 
   // The working copy lives in the tab until it is saved, so a forced sign-out does not lose it (2.2.1).
   useEffect(() => {
@@ -386,8 +205,8 @@ export function PricingEditor({ version, onSaved, onPublished, reviewOnOpen }: P
   }, [form]);
 
   const save = useCallback(async (): Promise<boolean> => {
-    if (saving) return false;
-    const result = fromForm(form);
+    if (saving || !regionGroups) return false;
+    const result = fromForm(form, version.content, regionGroups);
     setServerError(null);
     if (!result.ok) {
       focusSummary.current = true;
@@ -401,8 +220,7 @@ export function PricingEditor({ version, onSaved, onPublished, reviewOnOpen }: P
       const saved = await api.replacePricingVersion(version.id, result.content);
       setBaseline(form);
       setRestored(false);
-      const message = `Draft saved at ${new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}.`;
-      setSaveStatus(message);
+      setSaveStatus(`Draft saved at ${new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}.`);
       toast("Draft saved.");
       onSaved(saved);
       return true;
@@ -417,48 +235,28 @@ export function PricingEditor({ version, onSaved, onPublished, reviewOnOpen }: P
     } finally {
       setSaving(false);
     }
-  }, [api, form, onSaved, saving, toast, version.id]);
+  }, [api, form, onSaved, regionGroups, saving, toast, version.content, version.id]);
 
-  const ensureSaved = useCallback(async () => (dirty || errors.length > 0 ? save() : true), [dirty, errors.length, save]);
+  const ensureSaved = useCallback(async () => (unsaved || errors.length > 0 ? save() : true), [unsaved, errors.length, save]);
 
-  const removeRow = useCallback((kind: "service" | "tier") => (key: string, label: string) => {
-    dispatch({ type: `${kind}/remove`, key });
+  const remove = useCallback((key: string, label: string) => {
+    dispatch({ type: "remove", key });
     setRowStatus(`${label} removed.`);
     // Its row is gone; the "add" button below the table is the nearest stable place.
-    (kind === "service" ? addServiceRef : addTierRef).current?.focus();
+    addRef.current?.focus();
   }, []);
-  const removeService = useMemo(() => removeRow("service"), [removeRow]);
-  const removeTier = useMemo(() => removeRow("tier"), [removeRow]);
 
-  const tierCount = form.tiers.length;
-  const moveTier = useCallback(
-    (key: string, index: number, by: -1 | 1) => {
-      const to = index + by;
-      if (to < 0 || to >= tierCount) {
-        setRowStatus(by < 0 ? `Tier ${index + 1} is already first.` : `Tier ${index + 1} is already last.`);
-        return;
-      }
-      dispatch({ type: "tier/move", key, by });
-      setRowStatus(`Tier moved to position ${to + 1} of ${tierCount}.`);
-    },
-    [tierCount],
-  );
-
-  const serviceOptions = useMemo(
-    () => form.services.filter((s) => s.code.trim() !== "").map((s) => ({ id: s.code.trim(), label: s.name.trim() ? `${s.name.trim()} (${s.code.trim()})` : s.code.trim() })),
-    [form.services],
-  );
-  const serviceErrors = useRowErrors(errors, "service");
-  const tierErrors = useRowErrors(errors, "tier");
-
-  const parsed = useMemo(() => fromForm(form), [form]);
-  const existingTiers: Tier[] | null = parsed.ok ? parsed.content.tiers : null;
-  const savedContent: PricingVersionContent = version.content;
-
-  const onImport = useCallback((tiers: Tier[], mode: "replace" | "append") => {
-    dispatch({ type: "tiers/import", rows: tiers.map(tierToRow), mode });
-    setErrors([]);
-  }, []);
+  const rowErrors = useRowErrors(errors);
+  // Where each category starts: the end of the one above it.
+  const starts = useMemo(() => {
+    let from = 0;
+    return form.categories.map((row) => {
+      const start = from;
+      const upTo = parseWholeNumber(row.upTo);
+      if (upTo !== null && upTo > from) from = upTo;
+      return start;
+    });
+  }, [form.categories]);
 
   return (
     <div className="stack">
@@ -479,136 +277,57 @@ export function PricingEditor({ version, onSaved, onPublished, reviewOnOpen }: P
       )}
       <ErrorSummary errors={errors} summaryRef={summaryRef} title={errors.length === 1 ? "The draft has 1 problem, so it wasn’t saved" : `The draft has ${errors.length} problems, so it wasn’t saved`} />
 
-      <section className="card" aria-labelledby="settings-heading">
-        <h2 id="settings-heading">Settings</h2>
-        <div className="field-row">
-          <TextInput
-            id={fieldId.minCharge}
-            label="Minimum charge, in dollars"
-            description="The least you charge for the quoted service, however small the lawn."
-            inputMode="decimal"
-            value={form.minCharge}
-            onChange={(value) => dispatch({ type: "set", field: "minCharge", value })}
-            error={errorFor(errors, fieldId.minCharge)}
-            className="narrow"
-          />
-        </div>
-      </section>
-
-      <section className="card" aria-labelledby="services-heading">
-        <h2 id="services-heading">Services</h2>
+      <section className="card" aria-labelledby="categories-heading">
+        <h2 id="categories-heading">Lawn mowing prices</h2>
         <p className="muted">
-          Choose for every service whether sales tax applies. Taxable and non-taxable services are always shown to homeowners as separate lines.
+          Each lawn size category has one flat rate. The homeowner&rsquo;s outlined lawn area picks the category, and the quote is that rate. Each
+          category starts just above the one before it, so there are no gaps or overlaps; the last one covers every larger lawn.
         </p>
-        <TableScroll label="Services table">
+        <TableScroll label="Lawn size categories table">
           <table className="table editor-table">
             <thead>
               <tr>
-                <th scope="col">
-                  <span className="visually-hidden">Number</span>
-                </th>
-                <th scope="col">Name shown to homeowners</th>
-                <th scope="col">Code (lowercase letters, digits, underscores)</th>
-                <th scope="col">Sales tax</th>
-                <th scope="col">Season</th>
+                <th scope="col">Lawn size category</th>
+                <th scope="col">Up to, sq ft</th>
+                <th scope="col">Flat rate, $</th>
                 <th scope="col">
                   <span className="visually-hidden">Actions</span>
                 </th>
               </tr>
             </thead>
             <tbody>
-              {form.services.map((row, index) => (
-                <ServiceRowEditor key={row.key} row={row} index={index} errors={serviceErrors.get(row.key) ?? NO_ERRORS} dispatch={dispatch} onRemove={removeService} />
-              ))}
-            </tbody>
-          </table>
-        </TableScroll>
-        {form.services.length === 0 && <p className="muted">No services yet.</p>}
-        <Button
-          ref={addServiceRef}
-          className="btn"
-          onPress={() => {
-            const key = newKey();
-            focusField.current = fieldId.service(key, "name");
-            dispatch({ type: "service/add", key });
-          }}
-        >
-          Add service
-        </Button>
-      </section>
-
-      <section className="card" aria-labelledby="tiers-heading">
-        <h2 id="tiers-heading">Tiers</h2>
-        <p className="muted">
-          A tier prices one service for a range of lawn sizes: over the first number of square feet, up to and including the second. Price it per 1,000 square
-          feet or as one flat amount. Ranges for the same service and region group can&rsquo;t overlap. A lawn no tier covers gets &ldquo;call us&rdquo; instead
-          of a price.
-        </p>
-        <p className="muted">
-          A region group is a part of your service area that shares one set of prices, so you can charge more where the drive is longer.{" "}
-          {regionGroups.length === 1
-            ? `Your whole service area is one group, “${regionGroups[0]!.label}”, so every tier uses it.`
-            : regionGroups.length > 1
-              ? `Yours are: ${regionGroups.map((g) => g.label).join(", ")}.`
-              : ""}
-        </p>
-        <TableScroll label="Tiers table">
-          <table className="table editor-table">
-            <thead>
-              <tr>
-                <th scope="col">
-                  <span className="visually-hidden">Number</span>
-                </th>
-                <th scope="col">Service</th>
-                <th scope="col">Region group</th>
-                <th scope="col">Over, sq ft</th>
-                <th scope="col">Up to, sq ft</th>
-                <th scope="col">Priced</th>
-                <th scope="col">Price, $ per 1,000 sq ft or $ flat</th>
-                <th scope="col">Order and removal</th>
-              </tr>
-            </thead>
-            <tbody>
-              {form.tiers.map((row, index) => (
-                <TierRowEditor
+              {form.categories.map((row, index) => (
+                <CategoryRowEditor
                   key={row.key}
                   row={row}
                   index={index}
-                  errors={tierErrors.get(row.key) ?? NO_ERRORS}
-                  services={serviceOptions}
-                  regionGroups={regionGroups}
+                  from={starts[index]!}
+                  last={index === form.categories.length - 1}
+                  errors={rowErrors.get(row.key) ?? NO_ERRORS}
                   dispatch={dispatch}
-                  onRemove={removeTier}
-                  onMove={moveTier}
+                  onRemove={remove}
                 />
               ))}
             </tbody>
           </table>
         </TableScroll>
-        {form.tiers.length === 0 && (
-          <p className="muted">
-            {form.services.some((s) => s.code.trim() !== "")
-              ? "No tiers yet. Add one, or import a CSV file below."
-              : "No tiers yet. Add a service above first: a tier prices one of your services."}
-          </p>
-        )}
+        {form.categories.length === 0 && <p className="muted">No categories yet. Add one to start pricing.</p>}
         <Button
-          ref={addTierRef}
+          id="add-category"
+          ref={addRef}
           className="btn"
           onPress={() => {
             const key = newKey();
-            focusField.current = fieldId.tier(key, "service");
-            dispatch({ type: "tier/add", key, regionGroup: regionGroups[0]?.id ?? "" });
+            focusField.current = fieldId.category(key, form.categories.length === 0 ? "price" : "max");
+            dispatch({ type: "add", key });
           }}
         >
-          Add tier
+          Add category
         </Button>
         <p role="status" className="visually-hidden">
           {rowStatus}
         </p>
       </section>
-
-      <CsvImport serviceCodes={serviceOptions.map((s) => s.id)} existingTiers={existingTiers} onImport={onImport} />
 
       <section className="card save-bar" aria-label="Save and publish">
         <div className="form-actions">
@@ -626,7 +345,7 @@ export function PricingEditor({ version, onSaved, onPublished, reviewOnOpen }: P
         </div>
         {/* The lasting copy of the save result; the toast is the passing one. */}
         <p role="status" className="muted">
-          {dirty ? "You have unsaved changes." : saveStatus || "No unsaved changes."}
+          {unsaved ? "You have unsaved changes." : saveStatus || "No unsaved changes."}
         </p>
         {serverError && (
           <p role="alert" className="inline-error">
@@ -634,8 +353,6 @@ export function PricingEditor({ version, onSaved, onPublished, reviewOnOpen }: P
           </p>
         )}
       </section>
-
-      <PreviewQuote versionId={version.id} content={savedContent} beforePreview={ensureSaved} />
 
       <PublishDialog version={version} isOpen={publishOpen} onClose={() => setPublishOpen(false)} onPublished={onPublished} />
     </div>

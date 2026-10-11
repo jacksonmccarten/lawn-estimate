@@ -1,43 +1,33 @@
-// The pricing editor's form model. Inputs hold text; the contract holds
-// integers. `fromForm` turns one into the other and names every problem by the
-// id of the field it belongs to, so the editor can link each message to its
-// input and list them all in the error summary.
+// The pricing editor's form model: lawn-size categories, each with one flat
+// rate. Inputs hold text; the contract holds integers. `fromForm` turns one
+// into the other and names every problem by the id of the field it belongs
+// to, so the editor can link each message to its input and list them all in
+// the error summary.
+//
+// The categories are contiguous by construction: each row has only an upper
+// bound, the next row starts just above it, and the last row has no upper
+// bound. So there are never overlaps or gaps. Underneath they are still the
+// contract's tiers, written for the mowing service in each of the company's
+// region groups, so other services can be added later without a new model.
 
-import { PricingVersionContent, RegionGroup, ServiceCode, type Tier } from "@lq/api-contract";
-import {
-  centsToInput,
-  parseDollars,
-  parseRatePer1000,
-  parseWholeNumber,
-  rateToInput,
-} from "./money";
-import { findOverlaps } from "./tiers";
+import { PricingVersionContent, type Service, type Tier } from "@lq/api-contract";
+import { centsToInput, parseDollars, parseWholeNumber } from "./money";
 
-export type ServiceRow = {
+/** The one service quoted for now. */
+export const MOWING: Service = { code: "mow", name: "Lawn mowing", taxable: true, season: "growing" };
+
+/** The last category's upper bound: larger than any lawn a homeowner can draw or enter. */
+export const OPEN_END_SQFT = 1_000_000_000;
+
+export type CategoryRow = {
   key: string;
-  code: string;
-  name: string;
-  /** Empty until the owner chooses: a service's tax treatment is never defaulted (R1). */
-  taxable: "" | "yes" | "no";
-  season: "growing" | "winter";
-};
-
-export type TierRow = {
-  key: string;
-  serviceCode: string;
-  regionGroup: string;
-  minSqft: string;
-  maxSqft: string;
-  priceKind: "per_sqft" | "flat";
+  /** Up to and including, in square feet. Ignored on the last row, which has no upper bound. */
+  upTo: string;
   price: string;
 };
 
 export type PricingForm = {
-  minCharge: string;
-  /** Carried through unchanged and not shown: nothing uses it now that the area a homeowner gives is counted in full. */
-  coverageFactor: number;
-  services: ServiceRow[];
-  tiers: TierRow[];
+  categories: CategoryRow[];
 };
 
 export type FieldError = { fieldId: string; label: string; message: string };
@@ -45,115 +35,108 @@ export type FieldError = { fieldId: string; label: string; message: string };
 let nextKey = 0;
 export const newKey = () => `r${++nextKey}`;
 
-export function tierToRow(t: Tier): TierRow {
-  return {
-    key: newKey(),
-    serviceCode: t.serviceCode,
-    regionGroup: t.regionGroup,
-    minSqft: String(t.minSqft),
-    maxSqft: String(t.maxSqft),
-    priceKind: t.pricePerSqftMicrocents !== null ? "per_sqft" : "flat",
-    price: t.pricePerSqftMicrocents !== null ? rateToInput(t.pricePerSqftMicrocents) : centsToInput(t.flatPriceCents ?? 0),
-  };
+/** Example categories for a version that has none yet. */
+export const EXAMPLE_CATEGORIES: ReadonlyArray<{ upTo: number; cents: number }> = [
+  { upTo: 2_500, cents: 4_500 },
+  { upTo: 5_000, cents: 5_000 },
+  { upTo: 10_000, cents: 6_000 },
+  { upTo: 15_000, cents: 7_500 },
+  { upTo: OPEN_END_SQFT, cents: 9_000 },
+];
+
+/** The mowing service a version prices: its own, or the default. */
+export function mowingService(content: PricingVersionContent): Service {
+  return content.services.find((s) => s.code === MOWING.code) ?? MOWING;
+}
+
+/**
+ * The categories a version holds: its mowing tiers in one region group, in
+ * order of size. A tier priced per square foot (from before flat rates) comes
+ * through with no price, for the owner to fill in.
+ */
+export function categoriesOf(content: PricingVersionContent): Tier[] {
+  const mow = content.tiers.filter((t) => t.serviceCode === mowingService(content).code);
+  const group = [...new Set(mow.map((t) => t.regionGroup))].sort()[0];
+  return mow.filter((t) => t.regionGroup === group).sort((a, b) => a.minSqft - b.minSqft);
 }
 
 export function toForm(content: PricingVersionContent): PricingForm {
+  const tiers = categoriesOf(content);
+  if (tiers.length === 0) {
+    return { categories: EXAMPLE_CATEGORIES.map((c) => ({ key: newKey(), upTo: String(c.upTo), price: centsToInput(c.cents) })) };
+  }
   return {
-    minCharge: centsToInput(content.minChargeCents),
-    coverageFactor: content.coverageFactor,
-    services: content.services.map((s) => ({ key: newKey(), code: s.code, name: s.name, taxable: s.taxable ? "yes" : "no", season: s.season })),
-    tiers: content.tiers.map(tierToRow),
+    categories: tiers.map((t) => ({
+      key: newKey(),
+      upTo: String(t.maxSqft),
+      price: t.flatPriceCents !== null ? centsToInput(t.flatPriceCents) : "",
+    })),
   };
 }
 
 export const fieldId = {
-  minCharge: "min-charge",
-  service: (key: string, field: "code" | "name" | "taxable" | "season") => `service-${key}-${field}`,
-  tier: (key: string, field: "service" | "region" | "min" | "max" | "kind" | "price") => `tier-${key}-${field}`,
+  category: (key: string, field: "max" | "price") => `category-${key}-${field}`,
 };
+
+/** "0–2,500 sq ft", "2,501–5,000 sq ft", "15,001+ sq ft". */
+export function rangeLabel(from: number, upTo: number | null): string {
+  const n = (v: number) => v.toLocaleString("en-US");
+  if (upTo === null || upTo >= OPEN_END_SQFT) return `${n(from === 0 ? 0 : from + 1)}+ sq ft`;
+  return `${n(from === 0 ? 0 : from + 1)}–${n(upTo)} sq ft`;
+}
 
 export type FormResult = { ok: true; content: PricingVersionContent } | { ok: false; errors: FieldError[] };
 
-export function fromForm(form: PricingForm): FormResult {
+/**
+ * The version content for a form: the mowing service and its categories as
+ * flat-rate tiers in every region group the company has. No minimum charge:
+ * the price is the category's flat rate.
+ */
+export function fromForm(form: PricingForm, base: PricingVersionContent, regionGroups: readonly string[]): FormResult {
   const errors: FieldError[] = [];
   const add = (id: string, label: string, message: string) => errors.push({ fieldId: id, label, message });
 
-  const minChargeCents = parseDollars(form.minCharge);
-  if (minChargeCents === null) add(fieldId.minCharge, "Minimum charge", "Enter a dollar amount, such as 45.00");
-  const { coverageFactor } = form;
+  if (form.categories.length === 0) add("add-category", "Lawn size categories", "Add at least one lawn size category");
 
-  const codes = new Set<string>();
-  const services: PricingVersionContent["services"] = [];
-  form.services.forEach((row, i) => {
-    const label = `Service ${i + 1}`;
-    const code = row.code.trim();
-    const name = row.name.trim();
-    if (!code) add(fieldId.service(row.key, "code"), `${label}, code`, "Enter a code");
-    else if (!ServiceCode.safeParse(code).success) add(fieldId.service(row.key, "code"), `${label}, code`, "Use lowercase letters, digits and underscores, 40 at most");
-    else if (codes.has(code)) add(fieldId.service(row.key, "code"), `${label}, code`, `Another service already uses the code "${code}"`);
-    codes.add(code);
-    if (!name) add(fieldId.service(row.key, "name"), `${label}, name`, "Enter a name");
-    else if (name.length > 120) add(fieldId.service(row.key, "name"), `${label}, name`, "Use 120 characters or fewer");
-    if (row.taxable === "") add(fieldId.service(row.key, "taxable"), `${label}, sales tax`, "Choose whether sales tax applies to this service");
-    services.push({ code, name, taxable: row.taxable === "yes", season: row.season });
-  });
-
-  const tiers: Tier[] = [];
-  const complete: boolean[] = [];
-  form.tiers.forEach((row, i) => {
-    const label = `Tier ${i + 1}`;
-    const before = errors.length;
-    if (!row.serviceCode) add(fieldId.tier(row.key, "service"), `${label}, service`, "Choose a service");
-    else if (!codes.has(row.serviceCode)) add(fieldId.tier(row.key, "service"), `${label}, service`, `No service with the code "${row.serviceCode}" in this version`);
-    const regionGroup = row.regionGroup.trim();
-    if (!regionGroup) add(fieldId.tier(row.key, "region"), `${label}, region group`, "Enter a region group, such as core");
-    else if (!RegionGroup.safeParse(regionGroup).success) add(fieldId.tier(row.key, "region"), `${label}, region group`, "Use 40 characters or fewer");
-    const minSqft = parseWholeNumber(row.minSqft);
-    if (minSqft === null) add(fieldId.tier(row.key, "min"), `${label}, from`, "Enter a whole number of square feet, 0 or more");
-    const maxSqft = parseWholeNumber(row.maxSqft);
-    if (maxSqft === null) add(fieldId.tier(row.key, "max"), `${label}, up to`, "Enter a whole number of square feet");
-    else if (minSqft !== null && maxSqft <= minSqft) add(fieldId.tier(row.key, "max"), `${label}, up to`, "Must be greater than the “from” value");
-    const price = row.priceKind === "per_sqft" ? parseRatePer1000(row.price) : parseDollars(row.price);
-    if (price === null) {
-      add(
-        fieldId.tier(row.key, "price"),
-        `${label}, price`,
-        row.priceKind === "per_sqft" ? "Enter dollars per 1,000 sq ft, such as 7.50" : "Enter a dollar amount, such as 45.00",
-      );
+  const bounds: { min: number; max: number; cents: number }[] = [];
+  let from = 0;
+  form.categories.forEach((row, i) => {
+    const label = `Category ${i + 1}`;
+    const last = i === form.categories.length - 1;
+    let max = OPEN_END_SQFT;
+    if (!last) {
+      const upTo = parseWholeNumber(row.upTo);
+      if (upTo === null || upTo === 0) add(fieldId.category(row.key, "max"), `${label}, up to`, "Enter a whole number of square feet");
+      else if (upTo <= from) add(fieldId.category(row.key, "max"), `${label}, up to`, `Must be more than ${from.toLocaleString("en-US")}, where the category above ends`);
+      else if (upTo >= OPEN_END_SQFT) add(fieldId.category(row.key, "max"), `${label}, up to`, "Enter a smaller number of square feet");
+      else max = upTo;
     }
-    complete.push(errors.length === before);
-    tiers.push({
-      serviceCode: row.serviceCode,
-      regionGroup,
-      minSqft: minSqft ?? 0,
-      maxSqft: maxSqft ?? 0,
-      pricePerSqftMicrocents: row.priceKind === "per_sqft" ? price : null,
-      flatPriceCents: row.priceKind === "flat" ? price : null,
-    });
+    const cents = parseDollars(row.price);
+    if (cents === null) add(fieldId.category(row.key, "price"), `${label}, flat rate`, "Enter a dollar amount, such as 45.00");
+    bounds.push({ min: from, max, cents: cents ?? 0 });
+    if (max > from) from = max;
   });
 
-  // Overlaps are only meaningful between rows that are otherwise sound.
-  const sound = tiers.map((t, i) => ({ t, i })).filter(({ i }) => complete[i]);
-  for (const [a, b] of findOverlaps(sound.map(({ t }) => t))) {
-    const first = sound[a]!.i;
-    const second = sound[b]!.i;
-    add(fieldId.tier(form.tiers[second]!.key, "min"), `Tier ${second + 1}, from`, `This range overlaps tier ${first + 1} for the same service and region group`);
-  }
+  if (errors.length > 0) return { ok: false, errors };
 
-  if (errors.length > 0 || minChargeCents === null) return { ok: false, errors };
+  const service = mowingService(base);
+  const groups = regionGroups.length > 0 ? [...new Set(regionGroups)].sort() : ["standard"];
+  const tiers: Tier[] = groups.flatMap((regionGroup) =>
+    bounds.map((b) => ({
+      serviceCode: service.code,
+      regionGroup,
+      minSqft: b.min,
+      maxSqft: b.max,
+      pricePerSqftMicrocents: null,
+      flatPriceCents: b.cents,
+    })),
+  );
 
   // The contract has the last word; anything it rejects that the checks above
   // missed is still reported rather than sent.
-  const content = { minChargeCents, coverageFactor, services, tiers };
-  const parsed = PricingVersionContent.safeParse(content);
+  const parsed = PricingVersionContent.safeParse({ minChargeCents: 0, coverageFactor: base.coverageFactor, services: [service], tiers });
   if (!parsed.success) {
-    for (const issue of parsed.error.issues) {
-      const [list, index] = issue.path;
-      const row = list === "tiers" ? form.tiers[Number(index)] : list === "services" ? form.services[Number(index)] : undefined;
-      if (list === "tiers" && row) add(fieldId.tier(row.key, "price"), `Tier ${Number(index) + 1}`, issue.message);
-      else if (list === "services" && row) add(fieldId.service(row.key, "code"), `Service ${Number(index) + 1}`, issue.message);
-      else add(fieldId.minCharge, "Pricing version", issue.message);
-    }
+    for (const issue of parsed.error.issues) add("add-category", "Pricing", issue.message);
     return { ok: false, errors };
   }
   return { ok: true, content: parsed.data };
@@ -161,10 +144,6 @@ export function fromForm(form: PricingForm): FormResult {
 
 /** Whether two forms would save the same thing, ignoring row keys. */
 export function sameForm(a: PricingForm, b: PricingForm): boolean {
-  const strip = (f: PricingForm) => ({
-    minCharge: f.minCharge,
-    services: f.services.map(({ key: _key, ...rest }) => rest),
-    tiers: f.tiers.map(({ key: _key, ...rest }) => rest),
-  });
+  const strip = (f: PricingForm) => f.categories.map((c, i) => ({ upTo: i === f.categories.length - 1 ? "" : c.upTo, price: c.price }));
   return JSON.stringify(strip(a)) === JSON.stringify(strip(b));
 }
