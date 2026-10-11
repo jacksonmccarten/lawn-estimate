@@ -69,7 +69,7 @@ async function ensureLogin(): Promise<{ sub: string; password: string | null }> 
 }
 
 const login = await ensureLogin();
-const owner = new DataApiDbClient({ resourceArn: context.databaseClusterArn!, secretArn: state.OwnerLoginArn!, database: "lawnquote" });
+const owner = new DataApiDbClient({ resourceArn: state.DatabaseClusterArn!, secretArn: state.OwnerLoginArn!, database: "lawnquote" });
 const result = await ensureDemoCompany(owner, { ownerSubs: [login.sub], quota: 200, alertEmail: alertEmail! });
 
 console.log(`company ${DEMO_SLUG}: ${result}`);

@@ -12,8 +12,10 @@ export type Config = {
   dashboardOrigin: string;
   /** The SES-verified address lead alerts are sent from. */
   sesFrom: string;
-  /** The Aurora cluster infra/scripts/bootstrap-db.ts made. */
-  databaseClusterArn: string;
+  /** The snapshot the cluster in LqState is restored from. Once set, never changed: a new one replaces the database. */
+  databaseSnapshot?: string;
+  /** Before `databaseSnapshot` is set: the cluster infra/scripts/bootstrap-db.ts made, outside CloudFormation. */
+  databaseClusterArn?: string;
 };
 
 const ORIGIN = /^https:\/\/[a-z0-9.-]+(:\d{1,5})?$/;
@@ -31,9 +33,15 @@ export function readConfig(app: App): Config {
   };
   const sesFrom = text("sesFrom");
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(sesFrom)) throw new Error('context "sesFrom" must be an email address');
-  const databaseClusterArn = text("databaseClusterArn");
-  if (!/^arn:aws[a-z-]*:rds:[a-z0-9-]+:\d{12}:cluster:[A-Za-z0-9-]+$/.test(databaseClusterArn)) {
+  const optional = (name: string): string | undefined => (app.node.tryGetContext(name) === undefined ? undefined : text(name));
+  const databaseSnapshot = optional("databaseSnapshot");
+  if (databaseSnapshot !== undefined && !/^arn:aws[a-z-]*:rds:[a-z0-9-]+:\d{12}:cluster-snapshot:[A-Za-z0-9-]+$/.test(databaseSnapshot)) {
+    throw new Error('context "databaseSnapshot" must be the ARN of a cluster snapshot (infra/scripts/snapshot-db.ts prints it)');
+  }
+  const databaseClusterArn = optional("databaseClusterArn");
+  if (databaseClusterArn !== undefined && !/^arn:aws[a-z-]*:rds:[a-z0-9-]+:\d{12}:cluster:[A-Za-z0-9-]+$/.test(databaseClusterArn)) {
     throw new Error('context "databaseClusterArn" must be the ARN of an Aurora cluster (run infra/scripts/bootstrap-db.ts first)');
   }
-  return { region: text("region"), widgetOrigin: origin("widgetOrigin"), dashboardOrigin: origin("dashboardOrigin"), sesFrom, databaseClusterArn };
+  if (!databaseSnapshot && !databaseClusterArn) throw new Error('context "databaseSnapshot" (or, before the move, "databaseClusterArn") is not set');
+  return { region: text("region"), widgetOrigin: origin("widgetOrigin"), dashboardOrigin: origin("dashboardOrigin"), sesFrom, databaseSnapshot, databaseClusterArn };
 }

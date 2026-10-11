@@ -4,6 +4,7 @@
     "@aws-cdk/core:defaultCrossStackReferences": "strong",
     "region": "us-east-2",
     "databaseClusterArn": "arn:aws:rds:us-east-2:872515276223:cluster:lq-db",
+    "databaseSnapshot": "arn:aws:rds:us-east-2:872515276223:cluster-snapshot:lq-db-move-202610111929",
     "dashboardOrigin": "https://main.d38iw2kjyr3m5e.amplifyapp.com",
     "widgetOrigin": "https://main.d29b4c4utmqmdj.amplifyapp.com",
     "sesFrom": "alerts@not-set.invalid"

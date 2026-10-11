@@ -82,7 +82,7 @@ const [state, api] = [await outputs("LqState"), await outputs("LqApi")];
 const base = api.ApiUrl!;
 const widget = context.widgetOrigin!;
 const cognito = new CognitoIdentityProviderClient({ region });
-const owner = new DataApiDbClient({ resourceArn: context.databaseClusterArn!, secretArn: state.OwnerLoginArn!, database: "lawnquote" });
+const owner = new DataApiDbClient({ resourceArn: state.DatabaseClusterArn!, secretArn: state.OwnerLoginArn!, database: "lawnquote" });
 const email = `smoke-${randomBytes(4).toString("hex")}@example.com`;
 const password = `${randomBytes(12).toString("base64url")}aA1`;
 

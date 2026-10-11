@@ -19,8 +19,8 @@ const context = {
   sesFrom: "alerts@example.com",
 };
 
-function synth() {
-  const app = new App({ context });
+function synth(over: Record<string, unknown> = {}) {
+  const app = new App({ context: { ...context, ...over } });
   const config = readConfig(app);
   const env = { account: "111111111111", region: config.region };
   const state = new StateStack(app, "LqState", { env, config });
@@ -31,10 +31,50 @@ function synth() {
 const { state, api } = synth();
 
 describe("state stack", () => {
-  it("creates no database and no network: the cluster is made outside CloudFormation", () => {
+  it("before the move, builds the network and the key but no database, and uses the cluster it is told", () => {
     state.resourceCountIs("AWS::RDS::DBCluster", 0);
-    state.resourceCountIs("AWS::EC2::VPC", 0);
+    state.resourceCountIs("AWS::EC2::VPC", 1);
+    state.hasResourceProperties("AWS::KMS::Key", { EnableKeyRotation: true });
     state.hasOutput("OwnerLoginArn", {});
+    state.hasOutput("DatabaseClusterArn", { Value: "arn:aws:rds:us-east-2:111111111111:cluster:lq-db" });
+  });
+
+  it("has no way out of the network: no NAT gateway, no internet gateway, only isolated subnets", () => {
+    state.resourceCountIs("AWS::EC2::NatGateway", 0);
+    state.resourceCountIs("AWS::EC2::InternetGateway", 0);
+    state.resourceCountIs("AWS::EC2::Subnet", 2);
+    state.hasResourceProperties("AWS::EC2::FlowLog", { TrafficType: "REJECT" });
+  });
+
+  describe("after the move", () => {
+    const snapshot = "arn:aws:rds:us-east-2:111111111111:cluster-snapshot:lq-db-move-encrypted";
+    const moved = synth({ databaseSnapshot: snapshot });
+
+    it("restores the snapshot into the VPC, encrypted with its own key, with 7-day backups and the Data API", () => {
+      moved.state.resourceCountIs("AWS::RDS::DBCluster", 1);
+      moved.state.hasResourceProperties("AWS::RDS::DBCluster", {
+        SnapshotIdentifier: snapshot,
+        Engine: "aurora-postgresql",
+        EngineVersion: "17.9",
+        StorageEncrypted: true,
+        KmsKeyId: Match.anyValue(),
+        DBSubnetGroupName: Match.anyValue(),
+        BackupRetentionPeriod: 7,
+        EnableHttpEndpoint: true,
+        DeletionProtection: true,
+        ServerlessV2ScalingConfiguration: { MinCapacity: 0, MaxCapacity: 4, SecondsUntilAutoPause: 300 },
+      });
+      moved.state.hasResource("AWS::RDS::DBCluster", { DeletionPolicy: "Snapshot", UpdateReplacePolicy: "Snapshot" });
+      moved.state.hasResourceProperties("AWS::RDS::DBInstance", { DBInstanceClass: "db.serverless", PubliclyAccessible: false });
+    });
+
+    it("points the functions' Data API permission at the restored cluster and no other", () => {
+      const policies = Object.values(moved.api.findResources("AWS::IAM::Policy")).map((p) => JSON.stringify(p));
+      const estimate = policies.find((p) => p.includes('"Ref":"EstimateServiceRole'))!;
+      expect(estimate).toMatch(/rds-data:ExecuteStatement/);
+      expect(estimate).toMatch(/Fn::ImportValue/);
+      expect(estimate).not.toMatch(/cluster:lq-db"/);
+    });
   });
 
   it("keeps a login per database role, and the three application secrets apart", () => {
@@ -129,5 +169,7 @@ describe("configuration", () => {
     expect(() => config({ sesFrom: "" })).toThrow(/sesFrom/);
     expect(() => config({ sesFrom: "not an address" })).toThrow(/sesFrom/);
     expect(() => config({ databaseClusterArn: "lq-db" })).toThrow(/databaseClusterArn/);
+    expect(() => config({ databaseClusterArn: undefined })).toThrow(/databaseSnapshot/);
+    expect(() => config({ databaseSnapshot: "lq-db-snap" })).toThrow(/databaseSnapshot/);
   });
 });
