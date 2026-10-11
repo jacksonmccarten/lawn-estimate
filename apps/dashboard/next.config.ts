@@ -5,6 +5,15 @@ import type { NextConfig } from "next";
 // time (Playwright does that). A deployed build never serves either.
 const mock = process.env.LQ_MOCK ?? (process.env.NODE_ENV === "development" ? "1" : "0");
 
+// LQ_CANONICAL_ORIGIN (set in Amplify, read at build time): the app's one
+// public origin. A request on any other host (the amplifyapp.com address,
+// www.) is sent there for good. The API only answers browsers on the
+// canonical origins, so a page served elsewhere could not get an estimate.
+// Amplify's own redirect rules do not reach server-rendered pages, so it is
+// done here. Unset (local runs, tests): no redirect.
+const canonical = process.env.LQ_CANONICAL_ORIGIN ? new URL(process.env.LQ_CANONICAL_ORIGIN) : null;
+const escapeRegex = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 const config: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
@@ -27,6 +36,17 @@ const config: NextConfig = {
     // The widget origins, for the embed snippet and the hosted page link.
     NEXT_PUBLIC_WIDGET_SCRIPT_ORIGIN: process.env.NEXT_PUBLIC_WIDGET_SCRIPT_ORIGIN ?? "https://widget.example.test",
     NEXT_PUBLIC_WIDGET_APP_ORIGIN: process.env.NEXT_PUBLIC_WIDGET_APP_ORIGIN ?? "https://w.example.test",
+  },
+  async redirects() {
+    if (!canonical) return [];
+    return [
+      {
+        source: "/:path*",
+        missing: [{ type: "host", value: escapeRegex(canonical.host) }],
+        destination: `${canonical.origin}/:path*`,
+        permanent: true,
+      },
+    ];
   },
   async headers() {
     return [
