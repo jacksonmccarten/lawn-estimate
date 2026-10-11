@@ -161,3 +161,13 @@ describe("company", () => {
     expect(call("PATCH", "/company", { allowedOrigins: ["https://example.com"], theme: { color: "#123abc" } }).status).toBe(200);
   });
 });
+
+describe("billing", () => {
+  it("links to a hosted plan page or portal, for the two pages only", () => {
+    expect(call("POST", "/billing/session", { page: "plans" }).body).toEqual({ url: "https://billing.mock.invalid/plans" });
+    expect(call("POST", "/billing/session", { page: "portal" }).body).toEqual({ url: "https://billing.mock.invalid/portal" });
+    const other = call("POST", "/billing/session", { page: "admin" });
+    expect([other.status, errorCode(other)]).toEqual([400, "invalid_request"]);
+    expect(call("POST", "/billing/session", { page: "plans" }, null).status).toBe(401);
+  });
+});

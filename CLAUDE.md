@@ -32,7 +32,7 @@ Source of truth for design decisions: `docs/ENGINEERING_DESIGN.md`. Legal, tax a
 - Infrastructure: AWS CDK in `infra/` (stacks `LqState` and `LqApi`, us-east-2). Read `cdk diff` before every deploy; a change that replaces the database or the user pool is never deployed.
 - Database: Aurora Serverless v2 PostgreSQL (17, express configuration, created by `infra/scripts/bootstrap-db.ts` while the AWS account is on the free plan) via RDS Data API; migrations are backward-compatible. Over the Data API, parameters are written into the statement as literals by `packages/db/src/sql-text.ts`: handler SQL stays `$1`-style, and nothing else builds SQL from values.
 - Auth: Cognito user pool with self sign-up and email verification; password sign-in, an authenticator app optional; groups `admin` and `owner`. Text-message codes wait on a paid AWS plan and a registered sending number.
-- External: Mapbox (address lookup and static satellite photo, called from the homeowner's browser; no map library), Cloudflare Turnstile, SES + SNS (lead alerts), Stripe + Stripe Tax.
+- External: Mapbox (address lookup and static satellite photo, called from the homeowner's browser; no map library), Cloudflare Turnstile, SES + SNS (lead alerts), AWS Monetization (private beta: companies' plans, checkout and invoices; replaces the planned Stripe Checkout).
 - Components: React Aria Components (combobox, table, dialog). Lint: `eslint-plugin-jsx-a11y`. Tests: Vitest for `packages/pricing`, Playwright + `@axe-core/playwright` for routes.
 
 ## Conventions

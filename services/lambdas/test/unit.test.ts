@@ -4,6 +4,7 @@
 
 import type { PricingVersion } from "@lq/api-contract";
 import { describe, expect, it } from "vitest";
+import { createBilling, type MonetizationClient } from "../src/billing.js";
 import { claimsFrom } from "../src/company/api.js";
 import { diffVersions } from "../src/company/pricing-versions.js";
 import { HttpError } from "../src/http.js";
@@ -333,5 +334,56 @@ describe("pricing version diff", () => {
     expect(diff).toMatchObject({ publishedId: null, identical: false, minChargeCents: null, coverageFactor: null });
     expect(diff.services.added).toEqual([mow]);
     expect(diff.tiers.added).toHaveLength(2);
+  });
+});
+
+describe("billing through AWS Monetization", () => {
+  const deny = (code: string) => ({ decision: "DENY", reason: { category: "QUOTA", code } });
+  const client = (decision: unknown, seen: unknown[] = []): MonetizationClient =>
+    ({
+      checkEntitlement: async (userId: string, options: unknown) => {
+        seen.push([userId, options]);
+        if (decision instanceof Error) throw decision;
+        return decision;
+      },
+      putEvent: async (userId: string, event: unknown) => {
+        seen.push([userId, event]);
+        if (decision instanceof Error) throw decision;
+        return {};
+      },
+      createPricingSession: async (userId: string, options: unknown) => (seen.push([userId, options]), { pricingUrl: "https://p.example/#t" }),
+      createBillingPortalSession: async (userId: string, options: unknown) => (seen.push([userId, options]), { billingPortalUrl: "https://b.example/#t" }),
+    }) as unknown as MonetizationClient;
+  const quiet = () => {};
+
+  it("reads the plan's decision on estimate_priced for the company", async () => {
+    const seen: unknown[] = [];
+    expect(await createBilling(client({ decision: "ALLOW", reason: { code: "WITHIN_QUOTA" } }, seen), quiet).entitlement("alpha")).toBe("allow");
+    expect(seen).toEqual([["alpha", { eventType: "estimate_priced" }]]);
+    expect(await createBilling(client(deny("QUOTA_EXCEEDED")), quiet).entitlement("alpha")).toBe("deny");
+    expect(await createBilling(client(deny("BUDGET_EXCEEDED")), quiet).entitlement("alpha")).toBe("deny");
+  });
+
+  it("leaves an unsubscribed company, or a billing outage, to the database allowance", async () => {
+    expect(await createBilling(client(deny("NO_SUBSCRIPTION")), quiet).entitlement("alpha")).toBe("none");
+    expect(await createBilling(client(deny("SUBSCRIPTION_INACTIVE")), quiet).entitlement("alpha")).toBe("none");
+    const logged: unknown[] = [];
+    const billing = createBilling(client(new Error("boom")), (level, event, fields) => void logged.push([level, event, fields]));
+    expect(await billing.entitlement("alpha")).toBe("none");
+    // A failed count never fails the estimate.
+    await expect(billing.estimatePriced("alpha")).resolves.toBeUndefined();
+    expect(logged).toEqual([
+      ["warn", "billing_unavailable", { op: "entitlement", company: "alpha", error: "Error" }],
+      ["error", "billing_meter_failed", { company: "alpha", error: "Error" }],
+    ]);
+  });
+
+  it("makes hosted-page links that return where it is told", async () => {
+    const seen: unknown[] = [];
+    const billing = createBilling(client(null, seen), quiet);
+    expect(await billing.page("alpha", "plans", "https://app.example.com/billing")).toBe("https://p.example/#t");
+    expect(await billing.page("alpha", "portal", "https://app.example.com/billing")).toBe("https://b.example/#t");
+    const options = { returnUrl: "https://app.example.com/billing", refreshUrl: "https://app.example.com/billing", sessionDurationSeconds: 3600 };
+    expect(seen).toEqual([["alpha", options], ["alpha", options]]);
   });
 });

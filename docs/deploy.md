@@ -33,8 +33,35 @@ The account is on a paid plan (since 2026-10-11).
 | `widgetOrigin` | The widget app's origin. The only browser origin `/estimate` and `/submit` answer |
 | `dashboardOrigin` | The dashboard's origin, for CORS and for the links in lead alerts |
 | `sesFrom` | The SES-verified address lead alerts are sent from |
+| `monetizationAppId` | The AWS Monetization app that sells companies their plan. Its ARN, ending in `/sandbox` for the test copy (test cards, no real charges). Set with `monetizationEndpoint`, or leave both out to run without billing |
+| `monetizationEndpoint` | The AWS Monetization endpoint, as in `.env.monetization` |
 
 Override any of them for one command with `-c name=value`.
+
+## Billing (AWS Monetization, private beta)
+
+Companies buy their plan through AWS Monetization: a free Trial (50 estimates
+a month) and Standard ($100 a month, no practical limit). It hosts the plan,
+checkout and invoice pages; the dashboard's Billing page opens them. The
+`/estimate` function asks it before pricing and counts each new estimate
+(`services/lambdas/src/billing.ts`). A company with no subscription, or a
+moment when AWS Monetization does not answer, falls back to the database
+allowance (`companies.regrid_lookup_quota`).
+
+The SDK comes from a private npm registry (`.npmrc`). Installing needs its
+token, which is never committed:
+
+- **Your machine:** the token in `~/.npmrc`.
+- **GitHub Actions:** the repository secret `MONETIZATION_REGISTRY_TOKEN`.
+- **Amplify (both apps):** the environment variable `MONETIZATION_REGISTRY_TOKEN`,
+  as a secret. The front ends do not use the SDK, but `npm ci` installs every
+  workspace.
+
+Plans are drafts until published (the AWS Monetization console, or `/monetize
+live`). A paid plan publishes only once seller registration is `ACTIVE`. The
+beta's payments go to a test Stripe Connect account and may not be used for
+production: keep `monetizationAppId` on the `/sandbox` ARN until AWS
+Monetization is generally available.
 
 ## First deploy
 
