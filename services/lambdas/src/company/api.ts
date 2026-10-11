@@ -3,6 +3,7 @@
 // resolves the company from the caller's sub. No request names a company.
 
 import {
+  BillingSessionRequest,
   CreateCompanyRequest,
   CreatePricingVersionRequest,
   LeadDecisionRequest,
@@ -18,6 +19,7 @@ import {
 } from "@lq/api-contract";
 import type { Claims, DbTx, WithCompany, WithSignup } from "@lq/db";
 import type { z } from "zod";
+import type { Billing } from "../billing.js";
 import { HttpError, json, parseBody, respond, validate, type HttpEvent, type HttpResult } from "../http.js";
 import * as company from "./company.js";
 import * as leads from "./leads.js";
@@ -52,7 +54,16 @@ function verifiedEmail(event: HttpEvent): string | null {
   return String(claims?.email_verified) === "true" && typeof claims?.email === "string" ? claims.email : null;
 }
 
-export function createCompanyApi(deps: { withCompany: WithCompany; signUp: WithSignup }) {
+export type CompanyApiDeps = {
+  withCompany: WithCompany;
+  signUp: WithSignup;
+  /** Null when AWS Monetization is not configured: the billing route answers 503. */
+  billing: Billing | null;
+  /** https://app.<domain>: where a hosted billing page sends the owner back to. */
+  dashboardOrigin: string;
+};
+
+export function createCompanyApi(deps: CompanyApiDeps) {
   return (event: HttpEvent): Promise<HttpResult> =>
     respond(async () => {
       const claims = claimsFrom(event);
@@ -147,6 +158,21 @@ export function createCompanyApi(deps: { withCompany: WithCompany; signUp: WithS
 
         case "GET /usage":
           return ok(routes.getUsage.response, await run((tx) => company.getUsage(tx)));
+
+        case "POST /billing/session": {
+          const { page } = body(BillingSessionRequest);
+          if (!deps.billing) throw new HttpError("billing_unavailable", "billing is not configured");
+          // The subscriber is the caller's own company; nothing in the request names one.
+          const { slug } = await run((tx) => company.getCompany(tx));
+          // The return address is ours, never the request's: no open redirect.
+          let url: string;
+          try {
+            url = await deps.billing.page(slug, page, `${deps.dashboardOrigin}/billing`);
+          } catch (err) {
+            throw new HttpError("billing_unavailable", `AWS Monetization did not answer: ${(err as Error).name}`);
+          }
+          return ok(routes.createBillingSession.response, { url });
+        }
 
         default:
           throw new HttpError("not_found", "no such route");

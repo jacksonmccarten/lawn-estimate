@@ -38,6 +38,12 @@ jobs:
           node-version: 20
           cache: npm
 
+      # The AWS Monetization SDK comes from a private registry (.npmrc); its token is a repository secret.
+      - name: Registry token
+        run: npm config set "//d10ia5fq6mr3er.cloudfront.net/registry/:_authToken" "$MONETIZATION_REGISTRY_TOKEN"
+        env:
+          MONETIZATION_REGISTRY_TOKEN: ${{ secrets.MONETIZATION_REGISTRY_TOKEN }}
+
       - run: npm ci
 
       # A service container starts before checkout, so it cannot mount the

@@ -4,6 +4,7 @@
 
 import { createHmac } from "node:crypto";
 import type { WithPublic } from "@lq/db";
+import type { Billing } from "../billing.js";
 import { HttpError, type HttpEvent } from "../http.js";
 import type { Log } from "../log.js";
 import type { Notifier } from "./notify.js";
@@ -18,6 +19,8 @@ export type PublicDeps = {
   regrid: RegridLookup | null;
   tokens: TokenCodec;
   notifier: Notifier;
+  /** Null when AWS Monetization is not configured: the database allowance alone decides. */
+  billing: Billing | null;
   /** Salt for quotes.ip_hash; IPs are never stored as they are. */
   ipHashSalt: string;
   /** The widget app's own origin (https://w.<domain>). When set, calls from anywhere else are refused. */

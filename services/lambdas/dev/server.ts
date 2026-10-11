@@ -11,6 +11,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { routes } from "@lq/api-contract";
 import { createWithCompany, createWithPublic, createWithSignup, PgDbClient } from "@lq/db";
 import pg from "pg";
+import { billingFromEnv } from "../src/billing.js";
 import { createCompanyApi } from "../src/company/api.js";
 import type { HttpEvent, HttpResult } from "../src/http.js";
 import { log } from "../src/log.js";
@@ -25,6 +26,17 @@ import { createTurnstile } from "../src/public/turnstile.js";
 import { env, requireLocal } from "./env.js";
 
 requireLocal(env.publicUrl, env.rwUrl);
+
+// AWS Monetization's sandbox, from the committed .env.monetization at the
+// repo root, signed with your own AWS credentials. Without either, no billing.
+const monetizationEnv = new URL("../../../.env.monetization", import.meta.url);
+try {
+  process.loadEnvFile(monetizationEnv);
+} catch {
+  // No file: billing stays off.
+}
+const billing = await billingFromEnv(process.env, log);
+if (billing) console.log("[local] billing: AWS Monetization, app " + process.env.MONETIZATION_APP_ID);
 
 const withPublic = createWithPublic(new PgDbClient(new pg.Pool({ connectionString: env.publicUrl, max: 4 })));
 const rw = new PgDbClient(new pg.Pool({ connectionString: env.rwUrl, max: 4 }));
@@ -45,6 +57,7 @@ const publicDeps: PublicDeps = {
     dashboardUrl: env.dashboardOrigin,
     log,
   }),
+  billing,
   ipHashSalt: env.ipHashSalt,
   widgetOrigin: env.widgetOrigin,
   log,
@@ -53,7 +66,7 @@ const publicDeps: PublicDeps = {
 const estimate = createEstimateHandler(publicDeps);
 const submit = createSubmitHandler(publicDeps);
 const profile = createProfileHandler({ withPublic });
-const companyApi = createCompanyApi({ withCompany, signUp: createWithSignup(rw) });
+const companyApi = createCompanyApi({ withCompany, signUp: createWithSignup(rw), billing, dashboardOrigin: env.dashboardOrigin });
 
 type Handler = (event: HttpEvent) => Promise<HttpResult>;
 type Match = { handler: Handler; routeKey: string; params: Record<string, string>; owner: boolean };

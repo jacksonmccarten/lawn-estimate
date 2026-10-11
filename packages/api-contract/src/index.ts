@@ -41,6 +41,8 @@ export const routes = {
   decideLead: { method: "POST", path: "/leads/{id}/decision", auth: "owner", request: company.LeadDecisionRequest, response: company.Lead, errors: { 409: "lead_already_decided" } },
 
   getUsage: { method: "GET", path: "/usage", auth: "owner", response: company.Usage },
+
+  createBillingSession: { method: "POST", path: "/billing/session", auth: "owner", request: company.BillingSessionRequest, response: company.BillingSession, errors: { 503: "billing_unavailable" } },
 } as const;
 
 export const errorResponse = ErrorResponse;

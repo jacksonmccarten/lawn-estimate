@@ -72,6 +72,8 @@ export const ErrorCode = z.enum([
   "version_published",
   /** A lead is decided once. */
   "lead_already_decided",
+  /** AWS Monetization is not configured, or did not answer. */
+  "billing_unavailable",
   "internal",
 ]);
 export type ErrorCode = z.infer<typeof ErrorCode>;

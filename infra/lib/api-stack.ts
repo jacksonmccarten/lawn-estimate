@@ -31,6 +31,14 @@ const DATA_API_ACTIONS = [
   "rds-data:ExecuteStatement",
 ];
 
+/**
+ * What the functions call in AWS Monetization: the plan check and the meter (estimate) and the
+ * hosted billing pages (company API). The service does not yet authorize on the app's ARN, so the
+ * resource is "*"; scope it to the app once it does.
+ */
+const MONETIZATION_ESTIMATE_ACTIONS = ["appmonetization:GetEntitlementDecision", "appmonetization:PutEvent"];
+const MONETIZATION_DASHBOARD_ACTIONS = ["appmonetization:CreateSubscriptionCheckoutSession", "appmonetization:CreateBillingPortalSession"];
+
 export type ApiStackProps = StackProps & { config: Config; state: StateStack };
 
 export class ApiStack extends Stack {
@@ -69,7 +77,12 @@ export class ApiStack extends Stack {
       return func;
     };
 
+    const monetization: Record<string, string> = config.monetization
+      ? { MONETIZATION_APP_ID: config.monetization.appId, MONETIZATION_ENDPOINT: config.monetization.endpoint }
+      : {};
+
     const publicEnvironment = {
+      ...monetization,
       DB_PUBLIC_SECRET_ARN: state.publicLogin.secretArn,
       SECRETS_ARN: state.appSecrets.map((s) => s.secretArn).join(","),
       WIDGET_ORIGIN: config.widgetOrigin,
@@ -90,7 +103,13 @@ export class ApiStack extends Stack {
       }),
     );
     const profile = fn("Profile", "profile", [state.publicLogin], { environment: { DB_PUBLIC_SECRET_ARN: state.publicLogin.secretArn } });
-    const companyApi = fn("CompanyApi", "company-api", [state.rwLogin], { environment: { DB_RW_SECRET_ARN: state.rwLogin.secretArn } });
+    const companyApi = fn("CompanyApi", "company-api", [state.rwLogin], {
+      environment: { ...monetization, DB_RW_SECRET_ARN: state.rwLogin.secretArn, DASHBOARD_URL: config.dashboardOrigin },
+    });
+    if (config.monetization) {
+      estimate.addToRolePolicy(new iam.PolicyStatement({ actions: MONETIZATION_ESTIMATE_ACTIONS, resources: ["*"] }));
+      companyApi.addToRolePolicy(new iam.PolicyStatement({ actions: MONETIZATION_DASHBOARD_ACTIONS, resources: ["*"] }));
+    }
 
     // Run by hand after a deploy; the only function with the owner's login.
     const migrations = new lambda.LayerVersion(this, "Migrations", {

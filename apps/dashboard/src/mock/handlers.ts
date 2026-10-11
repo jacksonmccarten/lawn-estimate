@@ -5,6 +5,7 @@
 // company: it comes from the caller's `sub` through company_members.
 
 import {
+  BillingSessionRequest,
   CreateCompanyRequest,
   CreatePricingVersionRequest,
   ErrorResponse,
@@ -220,6 +221,12 @@ const handlers: Record<Exclude<keyof typeof routes, "estimate" | "submit" | "get
   },
 
   getUsage: ({ store }) => ({ schema: routes.getUsage.response, value: store.usage }),
+
+  // AWS Monetization hosts the real pages; the mock's link goes nowhere, and tests stop it there.
+  createBillingSession: ({ body }) => {
+    const { page } = parse(BillingSessionRequest, body);
+    return { schema: routes.createBillingSession.response, value: { url: `https://billing.mock.invalid/${page}` } };
+  },
 };
 
 function match(method: string, path: string): { name: keyof typeof handlers; id: string } | null {

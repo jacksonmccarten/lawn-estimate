@@ -5,6 +5,8 @@
 import {
   ErrorResponse,
   routes,
+  type BillingSession,
+  type BillingSessionRequest,
   type Company,
   type CreateCompanyRequest,
   type CreatePricingVersionRequest,
@@ -20,6 +22,7 @@ import {
   type PricingVersionList,
   type Regions,
   type UpdateCompanyRequest,
+  type Usage,
   type ZipsNear,
 } from "@lq/api-contract";
 import type { z } from "zod";
@@ -104,6 +107,9 @@ export function createApi({ baseUrl, getToken, onUnauthenticated }: ApiOptions) 
       call("listLeads", { query: { status: query.status, cursor: query.cursor, limit: query.limit?.toString() } }),
     getLead: (id: string): Promise<Lead> => call("getLead", { id }),
     decideLead: (id: string, body: LeadDecisionRequest): Promise<Lead> => call("decideLead", { id, body }),
+    getUsage: (): Promise<Usage> => call("getUsage"),
+    /** A short-lived link to a billing page AWS Monetization hosts. 503 `billing_unavailable` when it can't. */
+    createBillingSession: (body: BillingSessionRequest): Promise<BillingSession> => call("createBillingSession", { body }),
   };
 }
 
@@ -129,6 +135,8 @@ export function describeError(error: unknown): string {
         return "This lead has already been decided. A decision can’t be changed.";
       case "invalid_request":
         return "The server didn’t accept that. Check the values and try again.";
+      case "billing_unavailable":
+        return "Billing isn’t available right now. Try again in a few minutes.";
       default:
         return "Something went wrong on our side. Try again in a moment.";
     }

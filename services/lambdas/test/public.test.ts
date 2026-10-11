@@ -4,6 +4,7 @@
 
 import { EstimateResponse } from "@lq/api-contract";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import type { Entitlement } from "../src/billing.js";
 import type { PublicDeps } from "../src/public/deps.js";
 import { createEstimateHandler } from "../src/public/estimate.js";
 import { createProfileHandler } from "../src/public/profile.js";
@@ -85,6 +86,7 @@ beforeAll(async () => {
         return { email: targets.email !== null, sms: smsGoesOut && targets.smsAllowed };
       },
     },
+    billing: null,
     ipHashSalt: "pepper",
     widgetOrigin: null,
     log: (level, name, fields) => void logs.push({ level, event: name, fields }),
@@ -780,5 +782,63 @@ describe("the monthly allowance", () => {
     expect([third.status, third.body.error.code]).toEqual([429, "quota_exceeded"]);
     expect(await usage(echo)).toEqual({ regrid_lookups: 0, quotes: 2 });
     expect(regridCalls).toEqual([]);
+  });
+});
+
+describe("POST /estimate with AWS Monetization", () => {
+  let answer: Entitlement;
+  let asked: string[];
+  let metered: string[];
+
+  beforeEach(() => {
+    answer = "allow";
+    asked = [];
+    metered = [];
+    deps.billing = {
+      entitlement: async (company) => {
+        asked.push(company);
+        return answer;
+      },
+      estimatePriced: async (company) => void metered.push(company),
+      page: async () => "https://billing.example/page",
+    };
+  });
+  afterAll(() => {
+    deps.billing = null;
+  });
+
+  const manual = (company: string) => estimateBody({ company, manual: { zip: "16801", size: { kind: "sqft", sqft: 5000 } } });
+
+  it("lets a subscribed company price past its database allowance, and counts each estimate", async () => {
+    // bravo has no database allowance at all.
+    const res = await post(estimate, manual("bravo"));
+    expect(res.body.status).toBe("priced");
+    expect(asked).toEqual(["bravo"]);
+    expect(metered).toEqual(["bravo"]);
+  });
+
+  it("refuses a company whose plan is used up, whatever its database allowance, and counts nothing", async () => {
+    answer = "deny";
+    const res = await post(estimate, manual("alpha"));
+    expect([res.status, res.body.error.code]).toEqual([429, "quota_exceeded"]);
+    expect(metered).toEqual([]);
+  });
+
+  it("falls back to the database allowance for a company with no subscription", async () => {
+    answer = "none";
+    expect((await post(estimate, manual("alpha"))).body.status).toBe("priced");
+    const refused = await post(estimate, manual("bravo"));
+    expect([refused.status, refused.body.error.code]).toEqual([429, "quota_exceeded"]);
+    expect(metered).toEqual(["alpha"]);
+  });
+
+  it("counts an estimate once: an adjustment and an answer other than a price count nothing", async () => {
+    const priced = await post(estimate, estimateBody({ address: newAddress() }));
+    expect(priced.body.canAdjust).toBe(true);
+    const adjusted = await post(estimate, { token: priced.body.token, adjust: "larger", turnstile: "ts-token", embedOrigin: null });
+    expect(adjusted.body.status).toBe("priced");
+    const outside = await post(estimate, estimateBody({ address: "5 State St, Harrisburg, PA 17101" }));
+    expect(outside.body.status).toBe("call_us");
+    expect(metered).toEqual(["alpha"]);
   });
 });

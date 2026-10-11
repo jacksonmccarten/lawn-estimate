@@ -182,12 +182,15 @@ async function fresh(deps: PublicDeps, req: NewRequest, turnstileOk: boolean, ip
   const addressNorm = normalizeAddress(req.address);
   const addressZip = req.manual?.zip ?? zipFromAddress(req.address);
   const ctx: Ctx = { deps, req, phone: null, turnstileOk, ipHash: hashIp(deps.ipHashSalt, ip) };
+  // The company's plan, asked before the transaction: it is a call to AWS Monetization.
+  const entitlement = deps.billing ? await deps.billing.entitlement(req.company) : "none";
 
   // The gate, and everything that needs no Regrid call.
   const gated = await deps.withPublic(req.company, async (tx): Promise<Response | "lookup"> => {
     const gate = await db.estimateContext(tx, req.company, req.embedOrigin, req.service, addressNorm, addressZip);
     if (!gate.originAllowed) throw embedOriginRefused(deps, req.company);
-    if (!gate.quotaLeft) throw quotaExceeded(deps, req.company);
+    // A subscribed company's plan decides; without one, the database allowance does.
+    if (entitlement === "deny" || (entitlement === "none" && !gate.quotaLeft)) throw quotaExceeded(deps, req.company);
     if (!gate.serviceOffered) {
       throw new HttpError("invalid_request", "the company does not offer this service", { service: "not offered" });
     }
@@ -286,6 +289,8 @@ export function createEstimateHandler(deps: PublicDeps) {
       if (verdict === "unavailable") deps.log("warn", "turnstile_unavailable", { route: "estimate" });
 
       const body = "token" in req ? await adjust(deps, req) : await fresh(deps, req, verdict === "ok", ip);
+      // A new estimate priced is what the company's plan counts; an adjustment re-prices one already counted.
+      if (!("token" in req) && body.status === "priced" && deps.billing) await deps.billing.estimatePriced(req.company);
       // Strict schemas: a field the contract does not name cannot leave.
       return json(200, EstimateResponse.parse(body));
     });

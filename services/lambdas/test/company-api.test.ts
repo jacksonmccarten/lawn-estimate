@@ -4,6 +4,7 @@
 
 import { routes } from "@lq/api-contract";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import type { BillingPage } from "../src/billing.js";
 import { createCompanyApi } from "../src/company/api.js";
 import { createEstimateHandler } from "../src/public/estimate.js";
 import { createSubmitHandler } from "../src/public/submit.js";
@@ -33,7 +34,7 @@ beforeAll(async () => {
   db = await createTestDb();
   alpha = await db.seedCompany("alpha");
   bravo = await db.seedCompany("bravo");
-  api = createCompanyApi({ withCompany: db.withCompany, signUp: db.signUp });
+  api = createCompanyApi({ withCompany: db.withCompany, signUp: db.signUp, billing: null, dashboardOrigin: "https://app.example.com" });
 
   // Three leads for alpha, made the way homeowners make them.
   const tokens = createTokenCodec("test-secret-test-secret-test-secret");
@@ -46,6 +47,7 @@ beforeAll(async () => {
     }),
     tokens,
     notifier: { leadCreated: async () => ({ email: false, sms: false }) },
+    billing: null,
     ipHashSalt: "pepper",
     widgetOrigin: null,
     log: () => {},
@@ -463,5 +465,48 @@ describe("GET /zips-near", () => {
       expect((await near(query as Record<string, string>)).status, JSON.stringify(query)).toBe(400);
     }
     expect((await call(null, "GET /zips-near", { query: { zip: "16801", miles: "5" } })).status).toBe(401);
+  });
+});
+
+describe("POST /billing/session", () => {
+  it("answers 503 when AWS Monetization is not configured", async () => {
+    const res = await call(alpha, "POST /billing/session", { body: { page: "plans" } });
+    expect([res.status, res.body.error.code]).toEqual([503, "billing_unavailable"]);
+  });
+
+  it("links the caller's own company to a hosted page that returns to the dashboard", async () => {
+    const asked: { company: string; page: BillingPage; returnUrl: string }[] = [];
+    let down = false;
+    const billed = createCompanyApi({
+      withCompany: db.withCompany,
+      signUp: db.signUp,
+      dashboardOrigin: "https://app.example.com",
+      billing: {
+        entitlement: async () => "none",
+        estimatePriced: async () => {},
+        page: async (company, page, returnUrl) => {
+          if (down) throw new Error("ThrottlingException");
+          asked.push({ company, page, returnUrl });
+          return `https://billing.example/${page}#token=t`;
+        },
+      },
+    });
+    const post = async (company: TestCompany, body: unknown) =>
+      read(await billed(event({ routeKey: "POST /billing/session", sub: company.claims.sub, body })));
+
+    const plans = await post(alpha, { page: "plans" });
+    expect([plans.status, plans.body]).toEqual([200, { url: "https://billing.example/plans#token=t" }]);
+    expect(routes.createBillingSession.response.safeParse(plans.body).success).toBe(true);
+    expect((await post(bravo, { page: "portal" })).body).toEqual({ url: "https://billing.example/portal#token=t" });
+    expect(asked).toEqual([
+      { company: "alpha", page: "plans", returnUrl: "https://app.example.com/billing" },
+      { company: "bravo", page: "portal", returnUrl: "https://app.example.com/billing" },
+    ]);
+
+    const bad = await post(alpha, { page: "plans", returnUrl: "https://evil.example" });
+    expect([bad.status, bad.body.error.code]).toEqual([400, "invalid_request"]);
+    down = true;
+    const failed = await post(alpha, { page: "portal" });
+    expect([failed.status, failed.body.error.code]).toEqual([503, "billing_unavailable"]);
   });
 });

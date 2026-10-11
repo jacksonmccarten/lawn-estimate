@@ -2,6 +2,8 @@
 .env
 .env.*
 !.env.example
+# AWS Monetization app and endpoint: no secret in it.
+!.env.monetization
 
 # Secret material
 *.pem
@@ -28,3 +30,6 @@ node_modules/
 # OS / editor
 Thumbs.db
 .DS_Store
+
+# The monetize skill's local state.
+.monetize/

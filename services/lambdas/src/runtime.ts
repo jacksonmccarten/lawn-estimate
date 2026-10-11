@@ -16,11 +16,15 @@
 //   SES_FROM               the verified sender of lead alerts.
 //   SMS_ALERTS_ENABLED     "true" once 10DLC registration has cleared.
 //   REGRID_BASE_URL        optional override.
+//   MONETIZATION_APP_ID, MONETIZATION_ENDPOINT
+//                          AWS Monetization, which sells companies their plan
+//                          (src/billing.ts). Unset: no billing.
 
 import { GetSecretValueCommand, SecretsManagerClient } from "@aws-sdk/client-secrets-manager";
 import { SESv2Client, SendEmailCommand } from "@aws-sdk/client-sesv2";
 import { PublishCommand, SNSClient } from "@aws-sdk/client-sns";
 import { createWithCompany, createWithPublic, createWithSignup, DataApiDbClient, PgDbClient, type DbClient } from "@lq/db";
+import { billingFromEnv } from "./billing.js";
 import { createCompanyApi } from "./company/api.js";
 import { log } from "./log.js";
 import type { PublicDeps } from "./public/deps.js";
@@ -100,6 +104,7 @@ async function publicDeps(): Promise<PublicDeps> {
       dashboardUrl: required(env, "DASHBOARD_URL"),
       log,
     }),
+    billing: await billingFromEnv(env, log),
     ipHashSalt: required(env, "IP_HASH_SALT"),
     widgetOrigin: env.WIDGET_ORIGIN ?? null,
     log,
@@ -120,5 +125,10 @@ export const profile = lazy(async () =>
 );
 export const companyApi = lazy(async () => {
   const db = await dbClient(process.env, "RW");
-  return createCompanyApi({ withCompany: createWithCompany(db), signUp: createWithSignup(db) });
+  return createCompanyApi({
+    withCompany: createWithCompany(db),
+    signUp: createWithSignup(db),
+    billing: await billingFromEnv(process.env, log),
+    dashboardOrigin: required(process.env, "DASHBOARD_URL"),
+  });
 });
