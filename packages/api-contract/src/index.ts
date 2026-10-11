@@ -26,6 +26,8 @@ export const routes = {
   createCompany: { method: "POST", path: "/company", auth: "owner", request: company.CreateCompanyRequest, response: company.Company, errors: { 409: "conflict" } },
   getRegions: { method: "GET", path: "/regions", auth: "owner", response: company.Regions },
   replaceRegions: { method: "PUT", path: "/regions", auth: "owner", request: company.Regions, response: company.Regions },
+  getQuestionnaire: { method: "GET", path: "/questionnaire", auth: "owner", response: company.Questionnaire },
+  replaceQuestionnaire: { method: "PUT", path: "/questionnaire", auth: "owner", request: company.Questionnaire, response: company.Questionnaire },
   getZipsNear: { method: "GET", path: "/zips-near", auth: "owner", query: company.ZipsNearQuery, response: company.ZipsNear },
 
   listPricingVersions: { method: "GET", path: "/pricing-versions", auth: "owner", response: company.PricingVersionList },

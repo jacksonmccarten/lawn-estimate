@@ -13,6 +13,7 @@ import {
   ListLeadsQuery,
   PreviewQuoteRequest,
   PublishPricingVersionRequest,
+  Questionnaire,
   Regions,
   ReplacePricingVersionRequest,
   UpdateCompanyRequest,
@@ -98,6 +99,13 @@ const handlers: Record<Exclude<keyof typeof routes, "estimate" | "submit" | "get
   replaceRegions: ({ store, body }) => {
     store.regions = parse(Regions, body).regions;
     return { schema: routes.replaceRegions.response, value: { regions: store.regions } };
+  },
+
+  getQuestionnaire: ({ store }) => ({ schema: routes.getQuestionnaire.response, value: { questions: store.questions } }),
+
+  replaceQuestionnaire: ({ store, body }) => {
+    store.questions = parse(Questionnaire, body).questions;
+    return { schema: routes.replaceQuestionnaire.response, value: { questions: store.questions } };
   },
 
   // Great-circle miles between centre points, as the real route measures.

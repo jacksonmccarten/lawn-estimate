@@ -2,7 +2,7 @@
 // for services/lambdas + packages/db until step 4; it is never served by a
 // deployed build (see next.config.ts and the route handler).
 
-import type { Company, Lead, PricingVersion, PricingVersionContent, ServiceRegion, Usage } from "@lq/api-contract";
+import type { Company, Lead, PricingVersion, PricingVersionContent, Question, ServiceRegion, Usage } from "@lq/api-contract";
 import { priceQuote } from "@lq/pricing";
 import { PA_COUNTIES } from "@/lib/pa-counties";
 
@@ -11,6 +11,7 @@ export type Store = {
   /** company_members: Cognito sub → company. The only way a request finds its company. */
   members: Map<string, string>;
   regions: ServiceRegion[];
+  questions: Question[];
   versions: PricingVersion[];
   leads: Lead[];
   usage: Usage;
@@ -37,6 +38,15 @@ export const ZIP_CENTRES: Record<string, readonly [number, number]> = {
   "15217": [40.4308, -79.9203],
   "19103": [39.953372, -75.174187],
 };
+
+/** What every company starts with (migration 0016). */
+export const EXAMPLE_QUESTIONS: readonly Question[] = [
+  "Do you have any gates narrower than 60 inches?",
+  "Does your property have any steep hills?",
+  "Does your property have a swimming pool?",
+  "Are there any obstacles that could make mowing difficult?",
+  "Is your backyard accessible to standard lawn mowing equipment?",
+].map((text, i) => ({ id: `6a1f0c2e-0b0d-4d7e-9c51-3f6d1b1e0a0${i + 1}`, text, kind: "yes_no", options: [], required: true }));
 
 export const CATALOG_DEFAULTS: PricingVersionContent["services"] = [
   { code: "mow", name: "Mowing, trimming and edging", taxable: true, season: "growing" },
@@ -144,6 +154,7 @@ function seed(): Store {
       { kind: "zip", value: "16823", tierGroup: "outer" },
       { kind: "zip", value: "15217", tierGroup: "core" },
     ],
+    questions: EXAMPLE_QUESTIONS.map((q) => ({ ...q, options: [...q.options] })),
     versions,
     leads: seedLeads(versions),
     usage: { month: "2026-10-01", regridLookups: 212, quotes: 187, regridLookupQuota: 1000 },

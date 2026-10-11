@@ -468,6 +468,55 @@ describe("GET /zips-near", () => {
   });
 });
 
+describe("/questionnaire", () => {
+  const yesNo = (id: string, text: string, required = true) => ({ id, text, kind: "yes_no", options: [], required });
+
+  it("starts every company with the five example questions", async () => {
+    const { status, body } = await call(alpha, "GET /questionnaire");
+    expect(status).toBe(200);
+    expect(body.questions.map((q: { text: string }) => q.text)).toEqual([
+      "Do you have any gates narrower than 60 inches?",
+      "Does your property have any steep hills?",
+      "Does your property have a swimming pool?",
+      "Are there any obstacles that could make mowing difficult?",
+      "Is your backyard accessible to standard lawn mowing equipment?",
+    ]);
+    expect(body.questions.every((q: { kind: string; required: boolean }) => q.kind === "yes_no" && q.required)).toBe(true);
+  });
+
+  it("replaces the list as a whole, in order, for the caller's company only", async () => {
+    const questions = [
+      { id: "0f8a7b1c-1111-4c2d-8e3f-000000000002", text: "How tall is the grass now?", kind: "choice", options: ["Under 4 inches", "4 to 8 inches", "Over 8 inches"], required: false },
+      yesNo("0f8a7b1c-1111-4c2d-8e3f-000000000001", "Do you have a dog?"),
+    ];
+    const { status, body } = await call(bravo, "PUT /questionnaire", { body: { questions } });
+    expect([status, body]).toEqual([200, { questions }]);
+    expect((await call(bravo, "GET /questionnaire")).body).toEqual({ questions });
+    expect((await call(alpha, "GET /questionnaire")).body.questions).toHaveLength(5);
+    // An empty questionnaire is allowed: homeowners are asked nothing.
+    expect((await call(bravo, "PUT /questionnaire", { body: { questions: [] } })).body).toEqual({ questions: [] });
+  });
+
+  it("refuses a malformed question and changes nothing", async () => {
+    const before = (await call(alpha, "GET /questionnaire")).body;
+    const id = "0f8a7b1c-1111-4c2d-8e3f-000000000003";
+    for (const bad of [
+      [{ ...yesNo(id, "Pool?"), options: ["Yes"] }],
+      [{ id, text: "Grass?", kind: "choice", options: ["Short"], required: true }],
+      [{ id, text: "Grass?", kind: "choice", options: ["Short", "short"], required: true }],
+      [yesNo(id, "")],
+      [yesNo(id, "A"), yesNo(id, "B")],
+      [yesNo("not-a-uuid", "Pool?")],
+      Array.from({ length: 21 }, (_, i) => yesNo(`0f8a7b1c-1111-4c2d-8e3f-${String(i).padStart(12, "0")}`, `Q${i}`)),
+    ]) {
+      const res = await call(alpha, "PUT /questionnaire", { body: { questions: bad } });
+      expect([res.status, res.body.error.code], JSON.stringify(bad).slice(0, 80)).toEqual([400, "invalid_request"]);
+    }
+    expect((await call(alpha, "GET /questionnaire")).body).toEqual(before);
+    expect((await call(null, "GET /questionnaire")).status).toBe(401);
+  });
+});
+
 describe("POST /billing/session", () => {
   it("answers 503 when AWS Monetization is not configured", async () => {
     const res = await call(alpha, "POST /billing/session", { body: { page: "plans" } });
