@@ -68,7 +68,7 @@ export default function OnboardingPage() {
   if (state.status !== "signed-in" || !checked) {
     return (
       <main className="centered">
-        <title>Instant Lawn Quote</title>
+        <title>InstaQuotesAI</title>
         <p role="status" className="muted">
           Checking your account&hellip;
         </p>
@@ -78,9 +78,9 @@ export default function OnboardingPage() {
 
   return (
     <main className="centered">
-      <title>{"Set up your company · Instant Lawn Quote"}</title>
+      <title>{"Set up your company · InstaQuotesAI"}</title>
       <div className="card sign-in">
-        <p className="brand-name">Instant Lawn Quote</p>
+        <p className="brand-name">InstaQuotesAI</p>
         <h1>Set up your company</h1>
         <p>
           Signed in as <span className="nowrap">{state.session.email}</span>. Your company starts on a trial of 50 estimates a month,

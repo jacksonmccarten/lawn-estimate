@@ -1,4 +1,4 @@
-# Instant Lawn Quote Platform
+# InstaQuotesAI Platform
 
 B2B SaaS: lawn and snow operators embed a widget (or share a hosted page) that gives homeowners an instant price from the lawn they outline on an aerial photo of their address (Mapbox) and the operator's own rate table. Launch market: Pennsylvania.
 

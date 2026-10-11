@@ -118,9 +118,9 @@ function SignUp() {
 
   return (
     <main className="centered">
-      <title>{"Create an account · Instant Lawn Quote"}</title>
+      <title>{"Create an account · InstaQuotesAI"}</title>
       <div className="card sign-in">
-        <p className="brand-name">Instant Lawn Quote</p>
+        <p className="brand-name">InstaQuotesAI</p>
         <h1>{step === "details" ? "Create an account" : "Check your email"}</h1>
         {step === "verify" && (
           <p>
