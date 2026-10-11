@@ -4,9 +4,8 @@ tags: [howto]
 
 # Deploying the backend
 
-The secrets, user pool, API and Lambdas are defined with AWS CDK in `infra/`.
-The database is made by a script beside them, because of the account's plan
-(below). The two front ends are separate: they deploy from Amplify Hosting on
+The database, secrets, user pool, API and Lambdas are defined with AWS CDK
+in `infra/`. The two front ends are separate: they deploy from Amplify Hosting on
 every push to `main`. The design is in [[ENGINEERING_DESIGN]] (Decisions:
 "Infrastructure as code", "Database on the free plan", "Data API client").
 
@@ -14,25 +13,14 @@ every push to `main`. The design is in [[ENGINEERING_DESIGN]] (Decisions:
 
 | Piece | Made by | Holds |
 | --- | --- | --- |
-| Aurora cluster `lq-db` | `npm run bootstrap-db` | PostgreSQL 17, serverless, pauses to zero, Data API on, deletion protection on |
-| Stack `LqState` | CDK | A login secret for each database role, the three application secrets, the Cognito user pool. Termination protection on; the user pool is retained |
+| Stack `LqState` | CDK | The database (Aurora PostgreSQL 17, serverless, pauses to zero, Data API on, deletion protection on, 7-day backups) in a VPC of two isolated subnets with no route out, encrypted with the stack's KMS key; a login secret for each database role, the three application secrets, the Cognito user pool. Termination protection on; the user pool and the key are retained, the database leaves a snapshot if it is ever removed |
+| Aurora cluster `lq-db` | `npm run bootstrap-db`, on the free plan | The old cluster, outside the VPC and unencrypted. Kept, unused, until the move is confirmed; then delete it (below) |
 | Stack `LqApi` | CDK | The HTTP API, its routes (from `packages/api-contract`), five Lambdas. Stateless; safe to delete and deploy again |
 
 Not created yet: CloudFront and WAF in front of the API, the nightly cleanup
 job, alarms, and custom domains.
 
-> [!warning] The database is not in a private network
-> The AWS free plan allows Aurora only in its "express configuration": no
-> VPC, reached through Aurora's internet access gateway, with an admin that
-> signs in by IAM token alone. CloudFormation cannot create it, which is why
-> a script does. The application never uses that gateway; it goes through
-> the Data API as `app_public` and `app_rw`. When the account is on a paid
-> plan, move the database into the VPC the design describes (rev 2.3 of
-> `infra/lib/state-stack.ts` has it) and restore 7-day backups.
-
-> [!warning] The free plan closes the account
-> After six months, or when its credits are used, a free-plan account is
-> closed and its data deleted. Upgrade before anything real depends on it.
+The account is on a paid plan (since 2026-10-11).
 
 ## Settings
 
@@ -40,7 +28,8 @@ job, alarms, and custom domains.
 
 | Context | Meaning |
 | --- | --- |
-| `databaseClusterArn` | The cluster `bootstrap-db` made |
+| `databaseSnapshot` | The snapshot `LqState`'s cluster was restored from. **Never change it**: a new value replaces the database |
+| `databaseClusterArn` | The old cluster `bootstrap-db` made; read only by `snapshot-db` |
 | `widgetOrigin` | The widget app's origin. The only browser origin `/estimate` and `/submit` answer |
 | `dashboardOrigin` | The dashboard's origin, for CORS and for the links in lead alerts |
 | `sesFrom` | The SES-verified address lead alerts are sent from |
@@ -78,6 +67,29 @@ From `infra/`, with AWS credentials for the account:
    `LQ_TURNSTILE_SITE_KEY`, `NEXT_PUBLIC_MAPBOX_TOKEN`.
 10. Put the widget's origin in `cdk.json` as `widgetOrigin` and deploy `LqApi`
     again: the API answers that browser origin and no other.
+
+## Moving the database into the VPC
+
+Done once, on 2026-10-11, when the account left the free plan. Recorded for
+what it did; do not repeat it.
+
+1. `cdk deploy LqState` with no `databaseSnapshot`: the VPC and the key.
+2. `npm run snapshot-db`: a snapshot of the old cluster. Its ARN went into
+   `cdk.json` as `databaseSnapshot`. (The old cluster is unencrypted, and RDS
+   will not copy such a snapshot encrypted; the restore encrypts it, with
+   the key.)
+3. `cdk diff`, then `cdk deploy LqState LqApi`: the cluster restored into the
+   VPC, then the Lambdas' Data API calls pointed at it. Writes to the old
+   cluster between the snapshot and the deploy are not carried over.
+4. `npm run smoke`.
+
+The admin login is a secret `LqState` made (`Database/Secret`), encrypted
+with the key; nothing uses it day to day.
+
+Once the new cluster has served for a while, delete the old one and its
+snapshots by hand:
+`aws rds modify-db-cluster --db-cluster-identifier lq-db --no-deletion-protection --apply-immediately`,
+then `aws rds delete-db-cluster --db-cluster-identifier lq-db --final-db-snapshot-identifier lq-db-final`.
 
 ## Later deploys
 

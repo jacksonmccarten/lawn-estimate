@@ -10,6 +10,7 @@
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
     "bootstrap-db": "tsx scripts/bootstrap-db.ts",
+    "snapshot-db": "tsx scripts/snapshot-db.ts",
     "onboard-demo": "tsx scripts/onboard-demo.ts",
     "smoke": "tsx scripts/smoke.ts"
   },
