@@ -1,8 +1,8 @@
-// GET/PATCH /company, GET/PUT /regions, GET/PUT /service-area, GET /usage. Every statement runs
+// GET/PATCH /company, GET/PUT /regions, GET/PUT /service-area, GET/PUT /questionnaire, GET /usage. Every statement runs
 // inside withCompany, so RLS has already narrowed each table to the caller's
 // company; the WHERE clauses name no company unless a row count depends on it.
 
-import { RADIUS_REGION_GROUP, type Company, type Regions, type ServiceAreaSettings, type ServiceRadius, type UpdateCompanyRequest, type Usage, type ZipsNear, type ZipsNearQuery } from "@lq/api-contract";
+import { RADIUS_REGION_GROUP, type Company, type Questionnaire, type Regions, type ServiceAreaSettings, type ServiceRadius, type UpdateCompanyRequest, type Usage, type ZipsNear, type ZipsNearQuery } from "@lq/api-contract";
 import type { DbTx } from "@lq/db";
 import { fromJson, HttpError } from "../http.js";
 
@@ -107,6 +107,19 @@ export async function zipsNear(tx: DbTx, query: ZipsNearQuery): Promise<ZipsNear
   // The centre is always within range of itself, so no row means no such zip.
   if (res.rows.length === 0) throw new HttpError("invalid_request", "that zip code is not one we have a location for", { zip: "unknown zip" });
   return { zip: query.zip, miles: query.miles, zips: res.rows.map((r) => r.zip) };
+}
+
+export async function getQuestionnaire(tx: DbTx): Promise<Questionnaire> {
+  const res = await tx.query<{ questionnaire: unknown }>("SELECT questionnaire FROM companies");
+  const row = res.rows[0];
+  if (!row) throw new HttpError("not_found", "no such company");
+  return { questions: fromJson<Questionnaire["questions"]>(row.questionnaire) };
+}
+
+export async function replaceQuestionnaire(tx: DbTx, companyId: string, body: Questionnaire): Promise<Questionnaire> {
+  const res = await tx.query("UPDATE companies SET questionnaire = $2::jsonb WHERE id = $1", [companyId, JSON.stringify(body.questions)]);
+  if (res.rowCount !== 1) throw new HttpError("not_found", "no such company");
+  return getQuestionnaire(tx);
 }
 
 export async function getServiceArea(tx: DbTx): Promise<ServiceAreaSettings> {

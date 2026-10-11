@@ -13,6 +13,7 @@ import {
   ListLeadsQuery,
   PreviewQuoteRequest,
   PublishPricingVersionRequest,
+  Questionnaire,
   RADIUS_REGION_GROUP,
   Regions,
   ServiceRadius,
@@ -102,6 +103,14 @@ const handlers: Record<Exclude<keyof typeof routes, "estimate" | "submit" | "get
     return { schema: routes.replaceRegions.response, value: { regions: store.regions } };
   },
 
+  getQuestionnaire: ({ store }) => ({ schema: routes.getQuestionnaire.response, value: { questions: store.questions } }),
+
+  replaceQuestionnaire: ({ store, body }) => {
+    store.questions = parse(Questionnaire, body).questions;
+    return { schema: routes.replaceQuestionnaire.response, value: { questions: store.questions } };
+  },
+
+  // Great-circle miles between centre points, as the real route measures.
   getServiceArea: ({ store }) => ({
     schema: routes.getServiceArea.response,
     value: { radius: store.serviceRadius, zipCount: store.regions.filter((r) => r.kind === "zip").length },

@@ -75,6 +75,34 @@ export type ZipsNearQuery = z.infer<typeof ZipsNearQuery>;
 export const ZipsNear = z.strictObject({ zip: Zip, miles: z.number(), zips: z.array(Zip) });
 export type ZipsNear = z.infer<typeof ZipsNear>;
 
+// ---- GET /questionnaire, PUT /questionnaire
+
+/**
+ * A question the company asks homeowners before their estimate. `yes_no`
+ * questions have no options; `choice` questions have 2 to 8. Answers never
+ * change a price.
+ */
+export const Question = z
+  .strictObject({
+    id: Uuid,
+    text: z.string().trim().min(1).max(200),
+    kind: z.enum(["yes_no", "choice"]),
+    options: z.array(z.string().trim().min(1).max(80)).max(8),
+    required: z.boolean(),
+  })
+  .superRefine((q, ctx) => {
+    if (q.kind === "yes_no" && q.options.length > 0) ctx.addIssue({ code: "custom", message: "a yes/no question has no options", path: ["options"] });
+    if (q.kind === "choice" && q.options.length < 2) ctx.addIssue({ code: "custom", message: "a choice question needs at least 2 options", path: ["options"] });
+    if (new Set(q.options.map((o) => o.toLowerCase())).size !== q.options.length)
+      ctx.addIssue({ code: "custom", message: "options must differ", path: ["options"] });
+  });
+export type Question = z.infer<typeof Question>;
+
+/** The whole list, in the order homeowners see it. PUT replaces it. */
+export const Questionnaire = z
+  .strictObject({ questions: z.array(Question).max(20) })
+  .refine((q) => new Set(q.questions.map((x) => x.id)).size === q.questions.length, { message: "question ids must differ", path: ["questions"] });
+export type Questionnaire = z.infer<typeof Questionnaire>;
 // ---- GET /service-area, PUT /service-area
 
 /**
