@@ -7,7 +7,8 @@ applications:
           commands:
             - nvm use 22
             # The AWS Monetization SDK's private registry; MONETIZATION_REGISTRY_TOKEN is an Amplify secret.
-            - npm config set "//d10ia5fq6mr3er.cloudfront.net/registry/:_authToken" "$MONETIZATION_REGISTRY_TOKEN"
+            # From the repo root: npm config refuses to run inside a workspace (ENOWORKSPACES).
+            - (cd ../.. && npm config set "//d10ia5fq6mr3er.cloudfront.net/registry/:_authToken" "$MONETIZATION_REGISTRY_TOKEN")
             - (cd ../.. && npm ci)
         build:
           commands:
@@ -26,7 +27,8 @@ applications:
           commands:
             - nvm use 22
             # The AWS Monetization SDK's private registry; MONETIZATION_REGISTRY_TOKEN is an Amplify secret.
-            - npm config set "//d10ia5fq6mr3er.cloudfront.net/registry/:_authToken" "$MONETIZATION_REGISTRY_TOKEN"
+            # From the repo root: npm config refuses to run inside a workspace (ENOWORKSPACES).
+            - (cd ../.. && npm config set "//d10ia5fq6mr3er.cloudfront.net/registry/:_authToken" "$MONETIZATION_REGISTRY_TOKEN")
             - (cd ../.. && npm ci)
         build:
           commands:
