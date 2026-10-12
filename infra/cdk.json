@@ -11,8 +11,6 @@
     "zoneName": "instaquotesai.com",
     "hostedZoneId": "Z06677342QA3DYQVH6WAX",
     "apiDomain": "api.instaquotesai.com",
-    "originVerify": "log",
-    "monetizationAppId": "arn:aws:appmonetization:us-west-2:872515276223:apps/01a12cae79d47e3fb145ef443c8c38e8",
-    "monetizationEndpoint": "https://us-west-2.alpha.monetization.aws.dev"
+    "originVerify": "log"
   }
 }
