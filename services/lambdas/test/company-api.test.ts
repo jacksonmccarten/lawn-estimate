@@ -565,7 +565,7 @@ describe("/service-area", () => {
 });
 
 describe("POST /billing/session", () => {
-  it("answers 503 when AWS Monetization is not configured", async () => {
+  it("answers 503 when no billing provider is configured", async () => {
     const res = await call(alpha, "POST /billing/session", { body: { page: "plans" } });
     expect([res.status, res.body.error.code]).toEqual([503, "billing_unavailable"]);
   });

@@ -32,11 +32,6 @@ export type Config = {
   databaseSnapshot?: string;
   /** Before `databaseSnapshot` is set: the cluster infra/scripts/bootstrap-db.ts made, outside CloudFormation. */
   databaseClusterArn?: string;
-  /**
-   * AWS Monetization, which sells companies their plan: the app's ARN (ending in /sandbox for the
-   * test copy) and the service endpoint. Both or neither; unset, the functions run without billing.
-   */
-  monetization?: { appId: string; endpoint: string };
   /** Absent: no CloudFront, the API is reached at its execute-api address. */
   edge?: EdgeConfig;
 };
@@ -68,18 +63,6 @@ export function readConfig(app: App): Config {
     throw new Error('context "databaseClusterArn" must be the ARN of an Aurora cluster (run infra/scripts/bootstrap-db.ts first)');
   }
   if (!databaseSnapshot && !databaseClusterArn) throw new Error('context "databaseSnapshot" (or, before the move, "databaseClusterArn") is not set');
-  const monetizationAppId = optional("monetizationAppId");
-  const monetizationEndpoint = optional("monetizationEndpoint");
-  if ((monetizationAppId === undefined) !== (monetizationEndpoint === undefined)) {
-    throw new Error('context "monetizationAppId" and "monetizationEndpoint" are set together or not at all');
-  }
-  if (monetizationAppId !== undefined && !/^arn:aws:appmonetization:[a-z0-9-]+:\d{12}:apps\/[0-9a-f]{32}(\/sandbox)?$/.test(monetizationAppId)) {
-    throw new Error('context "monetizationAppId" must be an AWS Monetization app ARN, optionally ending in /sandbox');
-  }
-  if (monetizationEndpoint !== undefined && !ORIGIN.test(monetizationEndpoint)) {
-    throw new Error('context "monetizationEndpoint" must be an https origin with no path');
-  }
-  const monetization = monetizationAppId && monetizationEndpoint ? { appId: monetizationAppId, endpoint: monetizationEndpoint } : undefined;
   let edge: EdgeConfig | undefined;
   const apiDomain = optional("apiDomain");
   if (apiDomain !== undefined) {
@@ -100,7 +83,6 @@ export function readConfig(app: App): Config {
     contactTo,
     databaseSnapshot,
     databaseClusterArn,
-    monetization,
     ...(edge ? { edge } : {}),
   };
 }

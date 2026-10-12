@@ -39,44 +39,19 @@ The account is on a paid plan (since 2026-10-11).
 | `dashboardOrigin` | The dashboard's origin, for CORS and for the links in lead alerts |
 | `sesFrom` | The SES-verified address lead alerts and contact messages are sent from |
 | `contactTo` | Optional. Where the website contact form is emailed; unset, the form says it is unavailable |
-| `monetizationAppId` | The AWS Monetization app that sells companies their plan. Its ARN, ending in `/sandbox` for the test copy (test cards, no real charges). Set with `monetizationEndpoint`, or leave both out to run without billing |
-| `monetizationEndpoint` | The AWS Monetization endpoint, as in `.env.monetization` |
 | `zoneName`, `hostedZoneId` | The Route 53 zone the API's name is made in |
 | `apiDomain` | The API's public name, served by CloudFront behind WAF. Without it there is no CloudFront |
 | `originVerify` | `log` or `enforce`: whether a public request that skipped CloudFront (straight to `execute-api`) is only logged, or refused |
 
 Override any of them for one command with `-c name=value`.
 
-## Billing (AWS Monetization, private beta)
+## Billing
 
-Companies buy their plan through AWS Monetization: a free Trial (5 estimates
-a month) and Standard (no practical limit), paid by the month ($20) or for a
-full year ($200). It hosts the plan,
-checkout and invoice pages; the dashboard's Billing page opens them. The
-`/estimate` function asks it before pricing and counts each new estimate
-(`services/lambdas/src/billing.ts`). A company with no subscription, or a
-moment when AWS Monetization does not answer, falls back to the database
-allowance (`companies.regrid_lookup_quota`).
-
-The plans are not in this repository. A change to a price, a billing period or
-the Trial's allowance is made in AWS Monetization and published there; the
-sign-up allowance in the database (migration `0018`) and the wording on the
-dashboard's Billing and onboarding pages are kept in step by hand.
-
-The SDK comes from a private npm registry (`.npmrc`). Installing needs its
-token, which is never committed:
-
-- **Your machine:** the token in `~/.npmrc`.
-- **GitHub Actions:** the repository secret `MONETIZATION_REGISTRY_TOKEN`.
-- **Amplify (both apps):** the environment variable `MONETIZATION_REGISTRY_TOKEN`,
-  as a secret. The front ends do not use the SDK, but `npm ci` installs every
-  workspace.
-
-Plans are drafts until published (the AWS Monetization console, or `/monetize
-live`). A paid plan publishes only once seller registration is `ACTIVE`. The
-functions point at the live app: real companies pay real money. To test a
-change without charging anyone, deploy with
-`-c monetizationAppId=<the live ARN>/sandbox`.
+No billing provider is configured. The database allowance
+(`companies.regrid_lookup_quota`, 5 estimates a month for a new company)
+decides how many estimates a company may price; it is raised by hand for a
+company that needs more. `services/lambdas/src/billing.ts` is the seam a
+provider would plug into.
 
 ## First deploy
 

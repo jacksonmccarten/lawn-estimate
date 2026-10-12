@@ -798,7 +798,7 @@ describe("the monthly allowance", () => {
   });
 });
 
-describe("POST /estimate with AWS Monetization", () => {
+describe("POST /estimate with a billing provider", () => {
   let answer: Entitlement;
   let asked: string[];
   let metered: string[];
