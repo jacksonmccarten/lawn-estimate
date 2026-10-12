@@ -7,10 +7,6 @@
     "databaseSnapshot": "arn:aws:rds:us-east-2:872515276223:cluster-snapshot:lq-db-move-202610111929",
     "dashboardOrigin": "https://instaquotesai.com",
     "widgetOrigin": "https://w.instaquotesai.com",
-    "sesFrom": "alerts@not-set.invalid",
-    "zoneName": "instaquotesai.com",
-    "hostedZoneId": "Z06677342QA3DYQVH6WAX",
-    "apiDomain": "api.instaquotesai.com",
-    "originVerify": "log"
+    "sesFrom": "alerts@not-set.invalid"
   }
 }
