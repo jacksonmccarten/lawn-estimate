@@ -20,7 +20,7 @@ export type PublicDeps = {
   regrid: RegridLookup | null;
   tokens: TokenCodec;
   notifier: Notifier;
-  /** Null when AWS Monetization is not configured: the database allowance alone decides. */
+  /** Null when no billing provider is configured: the database allowance alone decides. */
   billing: Billing | null;
   /** Salt for quotes.ip_hash; IPs are never stored as they are. */
   ipHashSalt: string;

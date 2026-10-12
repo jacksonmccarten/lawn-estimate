@@ -72,7 +72,7 @@ export const ErrorCode = z.enum([
   "version_published",
   /** A lead is decided once. */
   "lead_already_decided",
-  /** AWS Monetization is not configured, or did not answer. */
+  /** No billing provider is configured, or it did not answer. */
   "billing_unavailable",
   /** No inbox is configured for the website's contact form. */
   "contact_unavailable",

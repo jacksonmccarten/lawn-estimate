@@ -36,14 +36,6 @@ const DATA_API_ACTIONS = [
   "rds-data:ExecuteStatement",
 ];
 
-/**
- * What the functions call in AWS Monetization: the plan check and the meter (estimate) and the
- * hosted billing pages (company API). The service does not yet authorize on the app's ARN, so the
- * resource is "*"; scope it to the app once it does.
- */
-const MONETIZATION_ESTIMATE_ACTIONS = ["appmonetization:GetEntitlementDecision", "appmonetization:PutEvent"];
-const MONETIZATION_DASHBOARD_ACTIONS = ["appmonetization:CreateSubscriptionCheckoutSession", "appmonetization:CreateBillingPortalSession"];
-
 export type ApiStackProps = StackProps & { config: Config; state: StateStack; edge?: EdgeStack };
 
 /**
@@ -92,15 +84,10 @@ export class ApiStack extends Stack {
       return func;
     };
 
-    const monetization: Record<string, string> = config.monetization
-      ? { MONETIZATION_APP_ID: config.monetization.appId, MONETIZATION_ENDPOINT: config.monetization.endpoint }
-      : {};
-
     // Behind CloudFront, the public functions check its origin-verify header (public/edge.ts).
     const edgeSecrets = config.edge ? [state.originVerifySecret] : [];
     const edgeEnvironment: Record<string, string> = config.edge ? { ORIGIN_VERIFY_ENFORCE: String(config.edge.originVerify === "enforce") } : {};
     const publicEnvironment = {
-      ...monetization,
       DB_PUBLIC_SECRET_ARN: state.publicLogin.secretArn,
       SECRETS_ARN: [...state.appSecrets, ...edgeSecrets].map((s) => s.secretArn).join(","),
       ...edgeEnvironment,
@@ -143,12 +130,8 @@ export class ApiStack extends Stack {
     });
     for (const secret of edgeSecrets) secret.grantRead(profile);
     const companyApi = fn("CompanyApi", "company-api", [state.rwLogin], {
-      environment: { ...monetization, DB_RW_SECRET_ARN: state.rwLogin.secretArn, DASHBOARD_URL: config.dashboardOrigin },
+      environment: { DB_RW_SECRET_ARN: state.rwLogin.secretArn, DASHBOARD_URL: config.dashboardOrigin },
     });
-    if (config.monetization) {
-      estimate.addToRolePolicy(new iam.PolicyStatement({ actions: MONETIZATION_ESTIMATE_ACTIONS, resources: ["*"] }));
-      companyApi.addToRolePolicy(new iam.PolicyStatement({ actions: MONETIZATION_DASHBOARD_ACTIONS, resources: ["*"] }));
-    }
 
     // Run by hand after a deploy; the only function with the owner's login.
     const migrations = new lambda.LayerVersion(this, "Migrations", {

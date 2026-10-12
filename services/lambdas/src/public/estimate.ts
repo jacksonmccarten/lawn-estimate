@@ -183,7 +183,7 @@ async function fresh(deps: PublicDeps, req: NewRequest, turnstileOk: boolean, ip
   const addressNorm = normalizeAddress(req.address);
   const addressZip = req.manual?.zip ?? zipFromAddress(req.address);
   const ctx: Ctx = { deps, req, phone: null, turnstileOk, ipHash: hashIp(deps.ipHashSalt, ip) };
-  // The company's plan, asked before the transaction: it is a call to AWS Monetization.
+  // The company's plan, asked before the transaction: it is a call to the billing provider.
   const entitlement = deps.billing ? await deps.billing.entitlement(req.company) : "none";
 
   // The gate, and everything that needs no Regrid call.

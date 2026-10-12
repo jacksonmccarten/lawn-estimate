@@ -117,7 +117,7 @@ export function createApi({ baseUrl, getToken, onUnauthenticated }: ApiOptions) 
     getLead: (id: string): Promise<Lead> => call("getLead", { id }),
     decideLead: (id: string, body: LeadDecisionRequest): Promise<Lead> => call("decideLead", { id, body }),
     getUsage: (): Promise<Usage> => call("getUsage"),
-    /** A short-lived link to a billing page AWS Monetization hosts. 503 `billing_unavailable` when it can't. */
+    /** A short-lived link to a billing page the billing provider hosts. 503 `billing_unavailable` when there is none. */
     createBillingSession: (body: BillingSessionRequest): Promise<BillingSession> => call("createBillingSession", { body }),
   };
 }

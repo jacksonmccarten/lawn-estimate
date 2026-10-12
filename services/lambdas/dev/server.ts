@@ -11,7 +11,6 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { routes } from "@lq/api-contract";
 import { createWithCompany, createWithPublic, createWithSignup, PgDbClient } from "@lq/db";
 import pg from "pg";
-import { billingFromEnv } from "../src/billing.js";
 import { createCompanyApi } from "../src/company/api.js";
 import type { HttpEvent, HttpResult } from "../src/http.js";
 import { log } from "../src/log.js";
@@ -29,16 +28,6 @@ import { env, requireLocal } from "./env.js";
 
 requireLocal(env.publicUrl, env.rwUrl);
 
-// AWS Monetization's sandbox, from the committed .env.monetization at the
-// repo root, signed with your own AWS credentials. Without either, no billing.
-const monetizationEnv = new URL("../../../.env.monetization", import.meta.url);
-try {
-  process.loadEnvFile(monetizationEnv);
-} catch {
-  // No file: billing stays off.
-}
-const billing = await billingFromEnv(process.env, log);
-if (billing) console.log("[local] billing: AWS Monetization, app " + process.env.MONETIZATION_APP_ID);
 
 const withPublic = createWithPublic(new PgDbClient(new pg.Pool({ connectionString: env.publicUrl, max: 4 })));
 const rw = new PgDbClient(new pg.Pool({ connectionString: env.rwUrl, max: 4 }));
@@ -59,7 +48,7 @@ const publicDeps: PublicDeps = {
     dashboardUrl: env.dashboardOrigin,
     log,
   }),
-  billing,
+  billing: null,
   ipHashSalt: env.ipHashSalt,
   widgetOrigin: env.widgetOrigin,
   // No CloudFront locally.
@@ -72,7 +61,7 @@ const submit = createSubmitHandler(publicDeps);
 const profile = createProfileHandler({ withPublic });
 // No SES locally: the contact form answers contact_unavailable, as it does in an environment with no inbox.
 const contact = createContactHandler({ turnstile: publicDeps.turnstile, inbox: null, siteOrigin: null, edge: NO_EDGE, log });
-const companyApi = createCompanyApi({ withCompany, signUp: createWithSignup(rw), billing, dashboardOrigin: env.dashboardOrigin });
+const companyApi = createCompanyApi({ withCompany, signUp: createWithSignup(rw), billing: null, dashboardOrigin: env.dashboardOrigin });
 
 type Handler = (event: HttpEvent) => Promise<HttpResult>;
 type Match = { handler: Handler; routeKey: string; params: Record<string, string>; owner: boolean };

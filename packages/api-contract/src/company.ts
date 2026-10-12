@@ -320,9 +320,9 @@ export type Usage = z.infer<typeof Usage>;
 // ---- POST /billing/session
 
 /**
- * The company's subscription is sold through AWS Monetization, which hosts the
- * pages: `plans` to choose or change a plan, `portal` for invoices, the card
- * and cancelling. The response is a short-lived link the dashboard opens.
+ * A short-lived link to a billing page the billing provider hosts: `plans` to
+ * choose or change a plan, `portal` for invoices, the card and cancelling. No
+ * provider is configured, so the route answers 503 `billing_unavailable`.
  */
 export const BillingSessionRequest = z.strictObject({ page: z.enum(["plans", "portal"]) });
 export type BillingSessionRequest = z.infer<typeof BillingSessionRequest>;

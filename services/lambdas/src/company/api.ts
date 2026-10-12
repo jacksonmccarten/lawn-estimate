@@ -59,7 +59,7 @@ function verifiedEmail(event: HttpEvent): string | null {
 export type CompanyApiDeps = {
   withCompany: WithCompany;
   signUp: WithSignup;
-  /** Null when AWS Monetization is not configured: the billing route answers 503. */
+  /** Null when no billing provider is configured: the billing route answers 503. */
   billing: Billing | null;
   /** https://app.<domain>: where a hosted billing page sends the owner back to. */
   dashboardOrigin: string;
@@ -184,7 +184,7 @@ export function createCompanyApi(deps: CompanyApiDeps) {
           try {
             url = await deps.billing.page(slug, page, `${deps.dashboardOrigin}/billing`);
           } catch (err) {
-            throw new HttpError("billing_unavailable", `AWS Monetization did not answer: ${(err as Error).name}`);
+            throw new HttpError("billing_unavailable", `the billing provider did not answer: ${(err as Error).name}`);
           }
           return ok(routes.createBillingSession.response, { url });
         }

@@ -153,44 +153,6 @@ describe("api stack", () => {
     expect(policy("Estimate")).not.toMatch(/ses:SendEmail/);
   });
 
-  describe("AWS Monetization", () => {
-    const appId = "arn:aws:appmonetization:us-west-2:111111111111:apps/0123456789abcdef0123456789abcdef/sandbox";
-    const billed = synth({ monetizationAppId: appId, monetizationEndpoint: "https://us-west-2.monetization.example" });
-    const billedPolicy = (fn: string) =>
-      JSON.stringify(
-        Object.values(billed.api.findResources("AWS::IAM::Policy")).find((p) =>
-          JSON.stringify((p as { Properties: { Roles: unknown } }).Properties.Roles).includes(fn),
-        ),
-      );
-    const environment = (fn: string) =>
-      JSON.stringify(
-        Object.entries(billed.api.findResources("AWS::Lambda::Function")).find(([id]) => id.startsWith(fn))?.[1],
-      );
-
-    it("is off unless configured: no app, no permission", () => {
-      expect(JSON.stringify(api.toJSON())).not.toMatch(/appmonetization|MONETIZATION_/);
-    });
-
-    it("lets estimate check the plan and count, and the company API open the hosted pages, and nothing else", () => {
-      expect(billedPolicy("Estimate")).toMatch(/appmonetization:GetEntitlementDecision/);
-      expect(billedPolicy("Estimate")).toMatch(/appmonetization:PutEvent/);
-      expect(billedPolicy("Estimate")).not.toMatch(/Session/);
-      expect(billedPolicy("CompanyApi")).toMatch(/appmonetization:CreateBillingPortalSession/);
-      expect(billedPolicy("CompanyApi")).not.toMatch(/PutEvent|GetEntitlementDecision/);
-      for (const fn of ["Submit", "Profile", "Migrate"]) expect(billedPolicy(fn)).not.toMatch(/appmonetization/);
-      expect(environment("Estimate")).toContain(appId);
-      expect(environment("CompanyApi")).toContain(appId);
-      expect(environment("Profile")).not.toContain("MONETIZATION_");
-    });
-
-    it("refuses an app id that is not an ARN, or one setting without the other", () => {
-      const config = (over: Record<string, unknown>) => readConfig(new App({ context: { ...context, ...over } }));
-      expect(() => config({ monetizationAppId: "0123456789abcdef0123456789abcdef", monetizationEndpoint: "https://m.example" })).toThrow(/monetizationAppId/);
-      expect(() => config({ monetizationAppId: appId })).toThrow(/together/);
-      expect(() => config({ monetizationAppId: appId, monetizationEndpoint: "https://m.example/path" })).toThrow(/monetizationEndpoint/);
-    });
-  });
-
   it("runs six functions on Node 22, none of them in the VPC", () => {
     const functions = Object.values(api.findResources("AWS::Lambda::Function")).map((f) => (f as { Properties: Record<string, unknown> }).Properties);
     expect(functions).toHaveLength(6);

@@ -235,7 +235,7 @@ const handlers: Record<Exclude<keyof typeof routes, "estimate" | "submit" | "get
 
   getUsage: ({ store }) => ({ schema: routes.getUsage.response, value: store.usage }),
 
-  // AWS Monetization hosts the real pages; the mock's link goes nowhere, and tests stop it there.
+  // A billing provider would host the real pages; the mock's link goes nowhere.
   createBillingSession: ({ body }) => {
     const { page } = parse(BillingSessionRequest, body);
     return { schema: routes.createBillingSession.response, value: { url: `https://billing.mock.invalid/${page}` } };
