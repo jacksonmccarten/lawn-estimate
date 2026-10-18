@@ -1,0 +1,38 @@
+{
+	"nodes":[
+		{"id":"g-browsers","type":"group","label":"Browsers (Amplify Hosting)","x":0,"y":0,"width":920,"height":280},
+		{"id":"n-widget","type":"file","file":"structure/Widget App.md","x":40,"y":70,"width":400,"height":170},
+		{"id":"n-dashboard","type":"file","file":"structure/Dashboard App.md","x":480,"y":70,"width":400,"height":170},
+		{"id":"g-api","type":"group","label":"API (Lambda behind API Gateway)","x":0,"y":360,"width":920,"height":280},
+		{"id":"n-lambdas","type":"file","file":"structure/Lambdas.md","x":40,"y":430,"width":400,"height":170},
+		{"id":"n-contract","type":"file","file":"structure/API Contract Package.md","x":480,"y":430,"width":400,"height":170},
+		{"id":"g-shared","type":"group","label":"Shared packages","x":0,"y":720,"width":920,"height":280},
+		{"id":"n-pricing","type":"file","file":"structure/Pricing Package.md","x":40,"y":790,"width":400,"height":170},
+		{"id":"n-db","type":"file","file":"structure/Database Package.md","x":480,"y":790,"width":400,"height":170},
+		{"id":"g-data","type":"group","label":"PostgreSQL (Aurora via the Data API)","x":0,"y":1080,"width":920,"height":280},
+		{"id":"n-migrations","type":"file","file":"structure/Migrations.md","x":40,"y":1150,"width":400,"height":170},
+		{"id":"n-model","type":"file","file":"structure/Data Model.md","x":480,"y":1150,"width":400,"height":170},
+		{"id":"n-index","type":"file","file":"structure/Project Structure.md","x":1020,"y":70,"width":400,"height":170},
+		{"id":"n-root","type":"file","file":"structure/Repository Root.md","x":1460,"y":70,"width":400,"height":170},
+		{"id":"n-flows","type":"file","file":"structure/Request Flows.md","x":1020,"y":430,"width":400,"height":170},
+		{"id":"n-config","type":"file","file":"structure/Configuration.md","x":1460,"y":430,"width":400,"height":170},
+		{"id":"n-infra","type":"file","file":"structure/Infrastructure.md","x":1020,"y":790,"width":400,"height":170},
+		{"id":"n-testing","type":"file","file":"structure/Testing and CI.md","x":1020,"y":1150,"width":400,"height":170},
+		{"id":"n-glossary","type":"file","file":"structure/Glossary.md","x":1460,"y":1150,"width":400,"height":170}
+	],
+	"edges":[
+		{"id":"e-widget-lambdas","fromNode":"n-widget","toNode":"n-lambdas","fromSide":"bottom","toSide":"top","label":"/estimate · /submit · /profile (Turnstile)"},
+		{"id":"e-dashboard-lambdas","fromNode":"n-dashboard","toNode":"n-lambdas","fromSide":"bottom","toSide":"top","label":"owner routes (Cognito JWT)"},
+		{"id":"e-dashboard-contract","fromNode":"n-dashboard","toNode":"n-contract","fromSide":"bottom","toSide":"top","label":"schemas and types"},
+		{"id":"e-widget-contract","fromNode":"n-widget","toNode":"n-contract","fromSide":"right","toSide":"top","label":"types only"},
+		{"id":"e-lambdas-contract","fromNode":"n-lambdas","toNode":"n-contract","fromSide":"right","toSide":"left","label":"validates with"},
+		{"id":"e-lambdas-pricing","fromNode":"n-lambdas","toNode":"n-pricing","fromSide":"bottom","toSide":"top","label":"priceQuote"},
+		{"id":"e-lambdas-db","fromNode":"n-lambdas","toNode":"n-db","fromSide":"bottom","toSide":"top","label":"withPublic · withCompany · signUp"},
+		{"id":"e-dashboard-pricing","fromNode":"n-dashboard","toNode":"n-pricing","fromSide":"right","toSide":"right","label":"preview (mock)"},
+		{"id":"e-db-migrations","fromNode":"n-db","toNode":"n-migrations","fromSide":"bottom","toSide":"top","label":"applies"},
+		{"id":"e-migrations-model","fromNode":"n-migrations","toNode":"n-model","fromSide":"right","toSide":"left","label":"build"},
+		{"id":"e-infra-lambdas","fromNode":"n-infra","toNode":"n-lambdas","fromSide":"left","toSide":"right","label":"bundles into functions"},
+		{"id":"e-infra-contract","fromNode":"n-infra","toNode":"n-contract","fromSide":"left","toSide":"right","label":"routes table → HTTP API"},
+		{"id":"e-flows-lambdas","fromNode":"n-flows","toNode":"n-lambdas","fromSide":"left","toSide":"right","label":"walks through"}
+	]
+}

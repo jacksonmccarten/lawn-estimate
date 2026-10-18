@@ -1,0 +1,40 @@
+---
+tags: [structure, glossary]
+---
+
+# Glossary
+
+Words the code and the docs use, in alphabetical order, each with a link to where the thing lives.
+
+- **Allowance** (`companies.regrid_lookup_quota`): how many estimates a company may price in a month; 5 on a trial. The column name is historical: it once counted Regrid lookups. [[Configuration]]
+- **Allowed origins** (`companies.allowed_origins`): the sites that may embed a company's widget. Empty, the default, means any site. Enforced as `frame-ancestors` on the widget page and by `origin_allowed` in the API. [[Widget App]]
+- **`app_owner`, `app_rw`, `app_public`, `app_definer`**: the four database roles: the schema owner (migrations), the owner-route role, the public-route role with no table grants, and the owner of the cross-company view and functions. [[Database Package]]
+- **Company**: a lawn or snow operator; the tenant. Known publicly by its `slug`. [[Data Model]]
+- **Contract**: `packages/api-contract`, the zod schemas and route table every request and response is checked against. [[API Contract Package]]
+- **Data API**: the RDS Data API, the HTTPS path from the Lambdas to Aurora. Its typed parameters and one-statement calls are why `sql-text.ts` exists. [[Database Package]]
+- **Drawn** (`origin = drawn`): a quote priced from the area the homeowner outlined on the aerial photo. The other origins are `bucket` (a lot-size range), `manual` (a typed area), and the retired `regrid` and `regrid_adjusted`. [[Request Flows]]
+- **Edge**: CloudFront and WAF in front of the API, stack `LqEdge`; off as committed. [[Infrastructure]]
+- **Embed**: the `<script src="…/v1.js" data-company="…">` tag that injects the widget iframe. [[Widget App]]
+- **Estimate**: what the homeowner sees. Never a contract; the call to action is "request service" (R6). [[COMPLIANCE_REQUIREMENTS]]
+- **Fixtures**: the recorded request/response pairs in `apps/widget/fixtures` the widget runs on without an API. [[Widget App]]
+- **Hosted page**: `/w/[company]` opened directly rather than in an iframe, for operators with no website; the dashboard shows its link and a QR code. [[Widget App]]
+- **Lead**: a submitted quote with the homeowner's contact details. Decided once by the owner: accept, adjust or decline. [[Data Model]]
+- **Local loop**: the widget, the real handlers and the dashboard against the local database on one machine. [[local-loop]]
+- **Manual path**: the lot-size form, the fallback when there is no photo. [[Widget App]]
+- **Mock**: the dashboard's in-memory stand-in for sign-in and the company-api, on in `next dev` and with `LQ_MOCK=1`. [[Dashboard App]]
+- **Owner**: a company's login (also the Cognito group of that name); `admin` is the other group, which may act as any company with an audited header. [[Lambdas]]
+- **Pricing version**: a company's rate table, numbered, immutable once published; every quote pins the version that priced it. An edit makes a draft that becomes version n+1. [[Pricing Package]]
+- **Public profile**: what `GET /profile/{company}` returns and the widget page is rendered from: name, theme, published services, allowed origins. [[Request Flows]]
+- **Questionnaire**: a company's ordered list of yes/no or multiple-choice questions for homeowners; answers never change a price. [[Dashboard App]]
+- **Quote**: a priced estimate row, with its line items, tax, total and status. [[Data Model]]
+- **Quote token**: the signed (HMAC-SHA256) token `/estimate` returns and `/submit` sends back, naming the quote and company; valid 7 days. The price lives in the row. [[Lambdas]]
+- **Region group**: the name tiers are written for (`standard` for every radius-made area); a service region belongs to one. [[Data Model]]
+- **RLS**: Row Level Security, with `FORCE`, on every company-scoped table, keyed on `app.company_id`. [[Database Package]]
+- **Service area, service region**: where a company works, stored as zip (and county) regions. The dashboard sets it as a business address and a radius. [[Dashboard App]]
+- **Service catalog**: the seeded Pennsylvania service list with taxable flags per 61 Pa. Code § 55.6. [[Migrations]]
+- **Taxable**: the per-service flag that decides whether a line is in the taxable subtotal; tax is never applied to the whole quote (R1–R4). [[Pricing Package]]
+- **Tier**: one price for one service in one region group over a square-foot range; per square foot (microcents) or flat. [[Pricing Package]]
+- **Turnstile**: Cloudflare's bot check; a fresh token on every public call. [[Lambdas]]
+- **Widget**: the iframe app at `w.<domain>/w/[company]`. [[Widget App]]
+- **`withCompany`, `withPublic`, `signUp`**: the three database entry points. [[Database Package]]
+- **Wrong-tenant test**: `packages/db/test/rls.test.ts`, which proves one company cannot see or change another's rows and must pass before any feature merges. [[Testing and CI]]

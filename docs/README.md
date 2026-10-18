@@ -14,6 +14,7 @@ with **Open folder as vault** → `pre-hack/docs`.
 - [[gotchas]] — footguns, blocked paths, things that surprised us
 - [[deploy]] — deploy the database, API and Lambdas with CDK
 - [[local-loop]] — run the widget, the API and the dashboard together on one machine
+- `structure/` — how the repository is laid out, workspace by workspace; start at [[Project Structure]] or the [[Architecture.canvas|Architecture]] canvas
 - `decisions/` — one note per decision, created from [[decision|the decision template]]
 
 ## Conventions
